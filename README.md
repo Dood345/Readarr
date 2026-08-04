@@ -6,6 +6,10 @@ Third-party metadata mirrors exist, but as we're not involved with them at all, 
 
 Without anyone to take over Readarr development, we expect it to wither away, so we still encourage you to seek alternatives to Readarr.
 
+# About This Fork
+This project is a personal fork of the original Readarr project, which has been retired. This fork is maintained for personal experiments and development purposes only. This fork is in no way affiliated with, endorsed by, or related to the Servarr team.
+
+
 ## Key Points:
 - **Effective Immediately**: The retirement takes effect immediately. Please stay tuned for any possible further communications.
 - **Support Window**: We will provide support during a brief transition period to help with troubleshooting non metadata related issues.
