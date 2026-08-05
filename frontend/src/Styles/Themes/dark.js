@@ -43,6 +43,7 @@ module.exports = {
 
   torrentColor: '#00853d',
   usenetColor: '#17b1d9',
+  soulseekColor: '#7c3aed',
 
   // Labels
   inverseLabelColor: '#ddd',

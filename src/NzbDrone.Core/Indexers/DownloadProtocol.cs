@@ -21,4 +21,8 @@ namespace NzbDrone.Core.Indexers
     public class TorrentDownloadProtocol : IDownloadProtocol
     {
     }
+
+    public class SoulseekDownloadProtocol : IDownloadProtocol
+    {
+    }
 }
