@@ -106,7 +106,6 @@ namespace NzbDrone.Host
                                 services.Configure<ServerOptions>(config.GetSection("Readarr:Server"));
                                 services.Configure<LogOptions>(config.GetSection("Readarr:Log"));
                                 services.Configure<UpdateOptions>(config.GetSection("Readarr:Update"));
-                                services.Configure<MetadataOptions>(config.GetSection("Readarr:Metadata"));
                             }).Build();
 
                         break;
@@ -171,7 +170,6 @@ namespace NzbDrone.Host
                     services.Configure<ServerOptions>(config.GetSection("Readarr:Server"));
                     services.Configure<LogOptions>(config.GetSection("Readarr:Log"));
                     services.Configure<UpdateOptions>(config.GetSection("Readarr:Update"));
-                    services.Configure<MetadataOptions>(config.GetSection("Readarr:Metadata"));
                 })
                 .ConfigureWebHost(builder =>
                 {

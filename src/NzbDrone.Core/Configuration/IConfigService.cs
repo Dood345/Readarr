@@ -67,7 +67,6 @@ namespace NzbDrone.Core.Configuration
         string PlexClientIdentifier { get; }
 
         //Metadata
-        string MetadataSource { get; set; }
         MetadataProviderType MetadataProvider { get; set; }
         WriteAudioTagsType WriteAudioTags { get; set; }
         bool ScrubAudioTags { get; set; }

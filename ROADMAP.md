@@ -18,46 +18,14 @@ Branch: `feature/slskd-and-metadata-revival`
   3.1.7 as vulnerable and `TreatWarningsAsErrors` promotes NU1902 to an error, so `Readarr.Core` and
   everything above it failed to compile. Bumped to 4.16.0 / 3.1.12 (the versions the Lidarr fork
   runs), which dragged `System.Text.Encoding.CodePages` to 8.0.0.
-- **Metadata source is configurable.** `Readarr__Metadata__Source` (or `Metadata/Source` in
-  config.xml) now overrides the dead `api.bookinfo.club` endpoint. A bare host is accepted and
-  expanded to `<host>/{route}`.
-- **Migrated net6.0 → net8.0.** Not optional: see "Why net8 was forced" below.
-- **Readarr runs in Docker and author lookup works end to end.** `Dockerfile` +
-  `docker/entrypoint.sh` (ported from the Lidarr fork), wired into
-  `C:\Users\dood3\dockerComPlex\docker-compose.yml` alongside rreading-glasses.
+- **Metadata resolves in-process.** Open Library + Audible, no sidecar, no API key. The whole
+  bookinfo.club path has since been deleted; see "Metadata: resolved, in-process" below.
+- **Migrated net6.0 to net8.0.** Not optional: see "Why net8 was forced" below.
+- **Fixed API writes.** Every POST/PUT in `Readarr.Api.V1` silently bound an empty resource on
+  net8; 33 actions needed an explicit `[FromBody]`.
+- **Readarr runs in Docker.** `Dockerfile` + `docker/entrypoint.sh` (ported from the Lidarr fork),
+  wired into the dockerComPlex compose stack.
 - `CLAUDE.md` written.
-
-## Verified working
-
-Against the live stack, `readarr:local` on net8 with `Readarr__Metadata__Source` pointed at
-rreading-glasses:
-
-```
-GET /api/v1/author/lookup?term=Frank%20Herbert
-  -> 200, 2 results: Frank Herbert (foreignAuthorId 58), Brian Herbert (56)
-
-GET /api/v1/book/lookup?term=Dune
-  -> 200, 4 results: Dune Messiah (3634570), Children of Dune (3634573),
-     God Emperor of Dune (3634588), The Butlerian Jihad (1278722)
-```
-
-rreading-glasses' own log confirms the calls arrive from Readarr's container IP. **This is the
-first time author/book lookup has worked in this fork.**
-
-### Two caveats found while verifying
-
-1. **Book/title search does not use the metadata source at all.**
-   `src/NzbDrone.Core/MetadataSource/GoodreadsSearchProxy/GoodreadsSearchProxy.cs` hardcodes
-   `https://www.goodreads.com/book/auto_complete` in its constructor — a *second* hardcoded
-   external endpoint, with no config hook, scraping Goodreads' undocumented autocomplete API with a
-   spoofed browser User-Agent. It works today, but it is exactly the class of dependency that
-   killed Readarr, and `Readarr__Metadata__Source` does not cover it. Routing this through the
-   metadata source too is a natural follow-up.
-
-2. **rreading-glasses 500s on some works.** `getting book: json: cannot unmarshal number
-   3747532.25 into Go struct field ...stats.ratingsSum of type int64` — Goodreads returns a
-   fractional `ratingsSum` and rreading-glasses' generated client expects `int64`. Upstream bug in
-   rreading-glasses, not in Readarr. Individual works fail; lookup as a whole still works.
 
 ## Why net8 was forced
 
@@ -88,7 +56,8 @@ Fallout fixed during the migration:
 - **Two test call sites did not compile even before the migration** (`CoreTest.cs:32`,
   `SystemTimeCheckFixture.cs:21`, `error CS7036`): the previous session's
   `ReadarrCloudRequestBuilder` constructor change was verified against the host only, never against
-  the test projects. Both now pass `Options.Create(new MetadataOptions())`.
+  the test projects. (`MetadataOptions` has since been deleted along with the bookinfo path, so
+  both now construct `ReadarrCloudRequestBuilder` with no arguments.)
 
 No `global.json` was added. Without one, the SDK 8.0 image builds it and a newer local SDK still
 can; pinning to 8.0.x the way Lidarr does would break local builds on any machine without that
@@ -241,8 +210,11 @@ Flagging rather than deciding: this reverses the literal instruction, so confirm
 
 ## Metadata: resolved, in-process
 
-**There is no metadata sidecar any more.** rreading-glasses and its Postgres have been removed from
-the compose stack. Readarr resolves metadata itself:
+**There is no metadata sidecar, and no bookinfo code path.** rreading-glasses and its Postgres are
+gone from the compose stack, and `BookInfoProxy`, its resources, `MetadataRequestBuilder`,
+`MetadataOptions` / `Readarr__Metadata__Source`, `ConfigService.MetadataSource` and the
+`IReadarrCloudRequestBuilder.Metadata` factory have been deleted from the tree. Readarr resolves
+metadata itself:
 
 | Concern | Source |
 |---|---|
@@ -258,7 +230,8 @@ Neither needs an API key. Google Books was rejected: it returns HTTP 429 unauthe
 The five metadata interfaces (`IProvideAuthorInfo`, `IProvideBookInfo`, `ISearchForNewAuthor`,
 `ISearchForNewBook`, `ISearchForNewEntity`) are served by a single `BookMetadataProxy` facade, which
 dispatches to an `IBookMetadataProvider` chosen by the `MetadataProvider` config setting
-(`OpenLibrary` default, `BookInfo` for a bookinfo.club-compatible server such as rreading-glasses).
+There is currently exactly one provider, `OpenLibrary`; the seam exists so a second (Hardcover,
+Google Books) can be added without touching consumers.
 
 **Only one class may implement those five interfaces.** Composition registers every interface as a
 singleton with a single default, so a second implementation makes resolution ambiguous and the
@@ -307,43 +280,6 @@ series                            Dune (positions 3-6), The Dune Sequence (14-17
 
 `OpenLibraryProviderFixture` covers this against the live APIs (16 tests).
 
-## Appendix: the old sidecar approach
-
-Now stood up and answering. rreading-glasses (Goodreads flavour, `blampe/rreading-glasses:latest`
-with `--upstream=www.goodreads.com`) needs **no API key** — only a Postgres to cache into. The
-Hardcover flavour has better coverage but needs a `HARDCOVER_AUTH` bearer token that expires every
-1 January.
-
-```
-Readarr__Metadata__Source=http://rreading-glasses:8788/{route}
-```
-
-**There is no `/v1` prefix.** rreading-glasses serves `/author/{id}` and `/work/{id}` at the root;
-`/v1/...` falls through to its Swagger page and returns HTML with a 200, which would have failed
-deserialization rather than 404-ing. `/v1` was part of the dead bookinfo.club host's own layout, not
-a convention. Verified against the running container:
-
-| Route | Result |
-|---|---|
-| `/author/58` (Frank Herbert) | 200, `{"ForeignId":58,"Name":"Frank Herbert",...}` — keys match `AuthorResource` exactly |
-| `/work/3634570` | 200, 16 KB |
-| `/book/44492285` | 303 redirect to the work |
-| `/v1/author/58` | 200 **HTML** — the Swagger UI catch-all, not an error |
-
-Note `MetadataRequestBuilder` already had a second override path: `ConfigService.MetadataSource`,
-settable in the UI at `/settings/development`, which appends `/{route}` to whatever it is given.
-`ResolveMetadataSource` now appends the same `/{route}` for a bare host so the two agree.
-
-Also: the first `/author/{id}` response returned only **one** work. rreading-glasses backfills its
-cache in the background, so early responses are thin and fill in over time. Don't read a sparse
-first result as a failure.
-
-Audiobookshelf uses Audible and Google Books for its own metadata; those are *not* drop-in
-replacements for Readarr's `BookInfoProxy`, which expects the bookinfo.club schema
-(`src/NzbDrone.Core/MetadataSource/BookInfo/BookInfoResource/`). Writing an Audible or Open Library
-proxy that speaks that schema is a real project in its own right — worth scoping separately if
-rreading-glasses proves unreliable.
-
 ## Running the stack
 
 Readarr is built locally, not pulled:
@@ -355,9 +291,8 @@ cd C:\Users\dood3\dockerComPlex
 docker compose up -d readarr
 ```
 
-Readarr on :8787, rreading-glasses on :8788. Its Postgres is deliberately **not** published to the
-host (the upstream example publishes 5432, which collides with any other Postgres on the machine).
-Watchtower is excluded via label so it never replaces the local build with a registry pull.
+Readarr on :8787, and nothing else — metadata needs no companion service. Watchtower is excluded via
+label so it never replaces the local build with a registry pull.
 
 The runtime image needs `libsqlite3-0` from apt. `AssemblyLoader.LoadSqliteNativeLib` maps
 `sqlite3` to the *system* `libsqlite3.so.0` on Linux, and `System.Data.SQLite.Core.Servarr`

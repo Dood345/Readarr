@@ -26,13 +26,17 @@ Practical consequences:
   supplies author identity, bibliography and text editions from Open Library, and
   `MetadataSource/Audible/` adds audiobook editions, narrators and series sequence. Neither needs an
   API key. See the "Metadata providers" section below.
-- The old path still exists as a config option (`MetadataProvider=BookInfo`) for anyone pointing at
-  a bookinfo.club-compatible server such as rreading-glasses, via `Readarr__Metadata__Source` or
-  `ConfigService.MetadataSource` (settable in the UI at `/settings/development`).
-- **Book/title search under the BookInfo provider bypasses both.**
-  `MetadataSource/GoodreadsSearchProxy/GoodreadsSearchProxy.cs` hardcodes
-  `https://www.goodreads.com/book/auto_complete` with a spoofed browser User-Agent and has no config
-  hook. The OpenLibrary provider does not use it.
+- **The bookinfo path is gone entirely.** `BookInfoProxy`, its resources, `MetadataRequestBuilder`,
+  `MetadataOptions`/`Readarr__Metadata__Source`, `ConfigService.MetadataSource` and the
+  `IReadarrCloudRequestBuilder.Metadata` factory have all been deleted, along with their fixtures.
+  Nothing in the tree talks to `api.bookinfo.club` any more.
+- `MetadataSource/GoodreadsSearchProxy/` **survives** — it is used by `ImportListSyncService`, not
+  only by the old metadata proxy. It hardcodes `https://www.goodreads.com/book/auto_complete` with a
+  spoofed browser User-Agent and has no config hook. The OpenLibrary provider does not use it.
+- **The Goodreads import lists still assume Goodreads ids.** `ImportListSyncService` passes
+  `report.BookGoodreadsId` to `IProvideBookInfo`, which now resolves Open Library keys, so those
+  lookups cannot match. That feature was already dependent on Goodreads' retired API; it is a known
+  gap rather than a regression.
 - Nothing upstream will be merged back, so there is no need to keep changes upstream-shaped. This is
   the opposite of the sibling Lidarr fork (see below).
 
@@ -177,7 +181,8 @@ Refresh logic is in `Books/Services/Refresh*Service.cs` over a shared `RefreshEn
 `src/NzbDrone.Core/MetadataSource/`. The five interfaces — `IProvideAuthorInfo`, `IProvideBookInfo`,
 `ISearchForNewAuthor`, `ISearchForNewBook`, `ISearchForNewEntity` — are served by **one** class,
 `BookMetadataProxy`, which dispatches to an `IBookMetadataProvider` selected by the
-`MetadataProvider` config setting (`OpenLibrary` default, or `BookInfo`).
+`MetadataProvider` config setting. There is currently exactly one provider, `OpenLibrary`; the seam
+exists so a second (Hardcover, Google Books) can be added without touching consumers.
 
 **Never add a second implementation of those five interfaces.** Composition registers every
 interface as a singleton with a single default (`Composition/Extensions.cs`), so a second one makes
