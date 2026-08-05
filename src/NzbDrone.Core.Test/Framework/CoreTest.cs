@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Options;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Cache;
@@ -7,6 +8,7 @@ using NzbDrone.Common.EnvironmentInfo;
 using NzbDrone.Common.Http;
 using NzbDrone.Common.Http.Dispatchers;
 using NzbDrone.Common.Http.Proxy;
+using NzbDrone.Common.Options;
 using NzbDrone.Common.TPL;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.Http;
@@ -29,7 +31,7 @@ namespace NzbDrone.Core.Test.Framework
             Mocker.SetConstant<ICertificateValidationService>(new X509CertificateValidationService(Mocker.Resolve<ConfigService>(), TestLogger));
             Mocker.SetConstant<IHttpDispatcher>(new ManagedHttpDispatcher(Mocker.Resolve<IHttpProxySettingsProvider>(), Mocker.Resolve<ICreateManagedWebProxy>(), Mocker.Resolve<ICertificateValidationService>(), Mocker.Resolve<UserAgentBuilder>(), Mocker.Resolve<CacheManager>(), TestLogger));
             Mocker.SetConstant<IHttpClient>(new HttpClient(Array.Empty<IHttpRequestInterceptor>(), Mocker.Resolve<CacheManager>(), Mocker.Resolve<RateLimitService>(), Mocker.Resolve<IHttpDispatcher>(), TestLogger));
-            Mocker.SetConstant<IReadarrCloudRequestBuilder>(new ReadarrCloudRequestBuilder());
+            Mocker.SetConstant<IReadarrCloudRequestBuilder>(new ReadarrCloudRequestBuilder(Options.Create(new MetadataOptions())));
             Mocker.SetConstant<IMetadataRequestBuilder>(Mocker.Resolve<MetadataRequestBuilder>());
 
             var httpClient = Mocker.Resolve<IHttpClient>();

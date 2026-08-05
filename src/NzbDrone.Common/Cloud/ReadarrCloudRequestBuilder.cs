@@ -35,10 +35,13 @@ namespace NzbDrone.Common.Cloud
             }
 
             // Configuring a bare host is the obvious thing to try, so accept it rather than
-            // failing with an unhelpful 404 on every lookup.
+            // failing with an unhelpful 404 on every lookup. Only "/{route}" is appended, which
+            // matches both MetadataRequestBuilder's handling of the ConfigService override and
+            // rreading-glasses, which serves /author/{id} and /work/{id} at the root. The dead
+            // bookinfo.club's "/v1" prefix was part of that host's layout, not a convention.
             return configured.Contains("{route}")
                 ? configured
-                : configured.TrimEnd('/') + "/v1/{route}";
+                : configured.TrimEnd('/') + "/{route}";
         }
 
         public IHttpRequestBuilderFactory Services { get; }

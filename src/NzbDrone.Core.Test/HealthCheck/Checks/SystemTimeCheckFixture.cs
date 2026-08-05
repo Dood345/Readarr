@@ -1,9 +1,11 @@
 using System;
 using System.Text;
+using Microsoft.Extensions.Options;
 using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Cloud;
 using NzbDrone.Common.Http;
+using NzbDrone.Common.Options;
 using NzbDrone.Common.Serializer;
 using NzbDrone.Core.HealthCheck.Checks;
 using NzbDrone.Core.Localization;
@@ -18,7 +20,7 @@ namespace NzbDrone.Core.Test.HealthCheck.Checks
         [SetUp]
         public void Setup()
         {
-            Mocker.SetConstant<IReadarrCloudRequestBuilder>(new ReadarrCloudRequestBuilder());
+            Mocker.SetConstant<IReadarrCloudRequestBuilder>(new ReadarrCloudRequestBuilder(Options.Create(new MetadataOptions())));
         }
 
         private void GivenServerTime(DateTime dateTime)
