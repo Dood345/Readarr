@@ -113,24 +113,26 @@ The order matters; each step unblocks the next.
 See "Why net8 was forced" above. Targets now match the Lidarr fork, so subsequent ports are
 straight copies rather than retargeting exercises.
 
-### 2. Replace the `DownloadProtocol` enum with marker interfaces
+### 2. ~~Replace the `DownloadProtocol` enum with marker interfaces~~ — DONE
 
-`src/NzbDrone.Core/Indexers/DownloadProtocol.cs` is still:
+`IDownloadProtocol` marker interface + `UsenetDownloadProtocol` / `TorrentDownloadProtocol`,
+identified by type name as a string. 204 references across 71 files.
 
-```csharp
-public enum DownloadProtocol { Unknown = 0, Usenet = 1, Torrent = 2 }
-```
+What a third protocol now costs: add the class, add a `DelayProfileProtocolItem` entry, implement
+the indexer and download client. No switch sites to hunt down.
 
-Lidarr replaced this with an `IDownloadProtocol` marker interface plus string identity
-(`nameof(TorrentDownloadProtocol)`), which is exactly why adding Soulseek there needed roughly one
-mandatory edit. **Do this refactor before attempting slskd.** Bolting a third enum value on means
-touching every switch site and leaves the same problem for the next protocol.
+Things worth knowing before step 3:
 
-Port from `../Liedarr`, commit `fcfc60a27` ("New: Plugin support") plus the queue/history/API
-plumbing that carries protocol as a string.
-
-Watch for: `DelayProfile` persistence and migrations `043`/`046` in Lidarr converted enum→string;
-Readarr will need an equivalent migration (next number is **041**).
+- **`DelayProfile` changed shape, not just type.** `EnableUsenet`/`EnableTorrent`/`UsenetDelay`/
+  `TorrentDelay`/`PreferredProtocol` became an ordered `List<DelayProfileProtocolItem>` where order
+  carries preference. Ask `IsAllowedProtocol` / `IsPreferredProtocol` / `GetProtocolDelay`.
+- **Migration 041** converts existing rows. Blocklist and DownloadHistory needed a new text column
+  populated from the old int and then a rename, because SQLite cannot change a column type in place.
+  Next migration number is **042**.
+- **`ProtocolLabel` strips the `DownloadProtocol` suffix** before its CSS lookup. `styles[protocol]`
+  against the raw value returns undefined and renders unstyled — the bug the Lidarr port also had.
+- A new protocol needs a `DelayProfileProtocolItem` in `DelayProfile`'s constructor, or it will not
+  be allowed by default and releases will be silently rejected by `ProtocolSpecification`.
 
 ### 3. Port the slskd indexer and download client
 
