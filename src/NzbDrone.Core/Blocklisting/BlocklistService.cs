@@ -37,7 +37,7 @@ namespace NzbDrone.Core.Blocklisting
 
         public bool Blocklisted(int authorId, ReleaseInfo release)
         {
-            if (release.DownloadProtocol == DownloadProtocol.Torrent)
+            if (release.DownloadProtocol == nameof(TorrentDownloadProtocol))
             {
                 if (release is not TorrentInfo torrentInfo)
                 {
@@ -52,12 +52,12 @@ namespace NzbDrone.Core.Blocklisting
                 }
 
                 return _blocklistRepository.BlocklistedByTitle(authorId, release.Title)
-                    .Where(b => b.Protocol == DownloadProtocol.Torrent)
+                    .Where(b => b.Protocol == nameof(TorrentDownloadProtocol))
                     .Any(b => SameTorrent(b, torrentInfo));
             }
 
             return _blocklistRepository.BlocklistedByTitle(authorId, release.Title)
-                .Where(b => b.Protocol == DownloadProtocol.Usenet)
+                .Where(b => b.Protocol == nameof(UsenetDownloadProtocol))
                 .Any(b => SameNzb(b, release));
         }
 
@@ -183,7 +183,7 @@ namespace NzbDrone.Core.Blocklisting
                 PublishedDate = DateTime.Parse(message.Data.GetValueOrDefault("publishedDate")),
                 Size = long.Parse(message.Data.GetValueOrDefault("size", "0")),
                 Indexer = message.Data.GetValueOrDefault("indexer"),
-                Protocol = (DownloadProtocol)Convert.ToInt32(message.Data.GetValueOrDefault("protocol")),
+                Protocol = message.Data.GetValueOrDefault("protocol"),
                 Message = message.Message,
                 TorrentInfoHash = message.Data.GetValueOrDefault("torrentInfoHash")
             };

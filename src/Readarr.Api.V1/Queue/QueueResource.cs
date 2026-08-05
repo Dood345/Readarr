@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Download.TrackedDownloads;
-using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Qualities;
 using Readarr.Api.V1.Author;
 using Readarr.Api.V1.Books;
@@ -32,7 +31,7 @@ namespace Readarr.Api.V1.Queue
         public List<TrackedDownloadStatusMessage> StatusMessages { get; set; }
         public string ErrorMessage { get; set; }
         public string DownloadId { get; set; }
-        public DownloadProtocol Protocol { get; set; }
+        public string Protocol { get; set; }
         public string DownloadClient { get; set; }
         public bool DownloadClientHasPostImportCategory { get; set; }
         public string Indexer { get; set; }

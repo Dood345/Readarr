@@ -27,7 +27,7 @@ namespace NzbDrone.Core.Indexers
 
         public TorrentSeedConfiguration GetSeedConfiguration(RemoteBook remoteBook)
         {
-            if (remoteBook.Release.DownloadProtocol != DownloadProtocol.Torrent)
+            if (remoteBook.Release.DownloadProtocol != nameof(TorrentDownloadProtocol))
             {
                 return null;
             }

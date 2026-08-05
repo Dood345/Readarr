@@ -20,7 +20,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         {
             _remoteBook = new RemoteBook
             {
-                Release = new ReleaseInfo() { DownloadProtocol = DownloadProtocol.Usenet }
+                Release = new ReleaseInfo() { DownloadProtocol = nameof(UsenetDownloadProtocol) }
             };
         }
 

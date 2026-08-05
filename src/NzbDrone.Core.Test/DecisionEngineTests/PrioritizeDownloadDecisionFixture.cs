@@ -24,7 +24,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [SetUp]
         public void Setup()
         {
-            GivenPreferredDownloadProtocol(DownloadProtocol.Usenet);
+            GivenPreferredDownloadProtocol(nameof(UsenetDownloadProtocol));
         }
 
         private Book GivenBook(int id)
@@ -34,7 +34,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                             .Build();
         }
 
-        private RemoteBook GivenRemoteBook(List<Book> books, QualityModel quality, int age = 0, long size = 0, DownloadProtocol downloadProtocol = DownloadProtocol.Usenet, int indexerPriority = 25)
+        private RemoteBook GivenRemoteBook(List<Book> books, QualityModel quality, int age = 0, long size = 0, string downloadProtocol = nameof(UsenetDownloadProtocol), int indexerPriority = 25)
         {
             var remoteBook = new RemoteBook();
             remoteBook.ParsedBookInfo = new ParsedBookInfo();
@@ -60,14 +60,18 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             return remoteBook;
         }
 
-        private void GivenPreferredDownloadProtocol(DownloadProtocol downloadProtocol)
+        private void GivenPreferredDownloadProtocol(string downloadProtocol)
         {
+            // Preference is now the order of Items rather than a PreferredProtocol value, so put
+            // the wanted protocol first.
+            var profile = new DelayProfile();
+            profile.Items = profile.Items
+                .OrderByDescending(x => x.Protocol == downloadProtocol)
+                .ToList();
+
             Mocker.GetMock<IDelayProfileService>()
                   .Setup(s => s.BestForTags(It.IsAny<HashSet<int>>()))
-                  .Returns(new DelayProfile
-                  {
-                      PreferredProtocol = downloadProtocol
-                  });
+                  .Returns(profile);
         }
 
         [Test]
@@ -162,33 +166,33 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_put_usenet_above_torrent_when_usenet_is_preferred()
         {
-            GivenPreferredDownloadProtocol(DownloadProtocol.Usenet);
+            GivenPreferredDownloadProtocol(nameof(UsenetDownloadProtocol));
 
-            var remoteBook1 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: DownloadProtocol.Torrent);
-            var remoteBook2 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: DownloadProtocol.Usenet);
+            var remoteBook1 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: nameof(TorrentDownloadProtocol));
+            var remoteBook2 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: nameof(UsenetDownloadProtocol));
 
             var decisions = new List<DownloadDecision>();
             decisions.Add(new DownloadDecision(remoteBook1));
             decisions.Add(new DownloadDecision(remoteBook2));
 
             var qualifiedReports = Subject.PrioritizeDecisions(decisions);
-            qualifiedReports.First().RemoteBook.Release.DownloadProtocol.Should().Be(DownloadProtocol.Usenet);
+            qualifiedReports.First().RemoteBook.Release.DownloadProtocol.Should().Be(nameof(UsenetDownloadProtocol));
         }
 
         [Test]
         public void should_put_torrent_above_usenet_when_torrent_is_preferred()
         {
-            GivenPreferredDownloadProtocol(DownloadProtocol.Torrent);
+            GivenPreferredDownloadProtocol(nameof(TorrentDownloadProtocol));
 
-            var remoteBook1 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: DownloadProtocol.Torrent);
-            var remoteBook2 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: DownloadProtocol.Usenet);
+            var remoteBook1 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: nameof(TorrentDownloadProtocol));
+            var remoteBook2 = GivenRemoteBook(new List<Book> { GivenBook(1) }, new QualityModel(Quality.MP3), downloadProtocol: nameof(UsenetDownloadProtocol));
 
             var decisions = new List<DownloadDecision>();
             decisions.Add(new DownloadDecision(remoteBook1));
             decisions.Add(new DownloadDecision(remoteBook2));
 
             var qualifiedReports = Subject.PrioritizeDecisions(decisions);
-            qualifiedReports.First().RemoteBook.Release.DownloadProtocol.Should().Be(DownloadProtocol.Torrent);
+            qualifiedReports.First().RemoteBook.Release.DownloadProtocol.Should().Be(nameof(TorrentDownloadProtocol));
         }
 
         [Test]
@@ -246,7 +250,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             var torrentInfo1 = new TorrentInfo();
             torrentInfo1.PublishDate = DateTime.Now;
             torrentInfo1.Size = 0;
-            torrentInfo1.DownloadProtocol = DownloadProtocol.Torrent;
+            torrentInfo1.DownloadProtocol = nameof(TorrentDownloadProtocol);
             torrentInfo1.Seeders = 10;
 
             var torrentInfo2 = torrentInfo1.JsonClone();
@@ -272,7 +276,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             var torrentInfo1 = new TorrentInfo();
             torrentInfo1.PublishDate = DateTime.Now;
             torrentInfo1.Size = 0;
-            torrentInfo1.DownloadProtocol = DownloadProtocol.Torrent;
+            torrentInfo1.DownloadProtocol = nameof(TorrentDownloadProtocol);
             torrentInfo1.Seeders = 10;
             torrentInfo1.Peers = 10;
 
@@ -299,7 +303,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             var torrentInfo1 = new TorrentInfo();
             torrentInfo1.PublishDate = DateTime.Now;
             torrentInfo1.Size = 0;
-            torrentInfo1.DownloadProtocol = DownloadProtocol.Torrent;
+            torrentInfo1.DownloadProtocol = nameof(TorrentDownloadProtocol);
             torrentInfo1.Seeders = 0;
             torrentInfo1.Peers = 10;
 
@@ -326,7 +330,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
 
             var torrentInfo1 = new TorrentInfo();
             torrentInfo1.PublishDate = DateTime.Now;
-            torrentInfo1.DownloadProtocol = DownloadProtocol.Torrent;
+            torrentInfo1.DownloadProtocol = nameof(TorrentDownloadProtocol);
             torrentInfo1.Seeders = 1000;
             torrentInfo1.Peers = 10;
             torrentInfo1.Size = 200.Megabytes();
@@ -375,7 +379,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
 
             var torrentInfo1 = new TorrentInfo();
             torrentInfo1.PublishDate = DateTime.Now;
-            torrentInfo1.DownloadProtocol = DownloadProtocol.Torrent;
+            torrentInfo1.DownloadProtocol = nameof(TorrentDownloadProtocol);
             torrentInfo1.Seeders = 100;
             torrentInfo1.Peers = 10;
             torrentInfo1.Size = 200.Megabytes();

@@ -86,8 +86,7 @@ namespace NzbDrone.Core.DecisionEngine
             var result = CompareBy(x.RemoteBook, y.RemoteBook, remoteBook =>
             {
                 var delayProfile = _delayProfileService.BestForTags(remoteBook.Author.Tags);
-                var downloadProtocol = remoteBook.Release.DownloadProtocol;
-                return downloadProtocol == delayProfile.PreferredProtocol;
+                return delayProfile.IsPreferredProtocol(remoteBook.Release.DownloadProtocol);
             });
 
             return result;
@@ -111,8 +110,8 @@ namespace NzbDrone.Core.DecisionEngine
         {
             // Different protocols should get caught when checking the preferred protocol,
             // since we're dealing with the same series in our comparisions
-            if (x.RemoteBook.Release.DownloadProtocol != DownloadProtocol.Torrent ||
-                y.RemoteBook.Release.DownloadProtocol != DownloadProtocol.Torrent)
+            if (x.RemoteBook.Release.DownloadProtocol != nameof(TorrentDownloadProtocol) ||
+                y.RemoteBook.Release.DownloadProtocol != nameof(TorrentDownloadProtocol))
             {
                 return 0;
             }
@@ -134,8 +133,8 @@ namespace NzbDrone.Core.DecisionEngine
 
         private int CompareAgeIfUsenet(DownloadDecision x, DownloadDecision y)
         {
-            if (x.RemoteBook.Release.DownloadProtocol != DownloadProtocol.Usenet ||
-                y.RemoteBook.Release.DownloadProtocol != DownloadProtocol.Usenet)
+            if (x.RemoteBook.Release.DownloadProtocol != nameof(UsenetDownloadProtocol) ||
+                y.RemoteBook.Release.DownloadProtocol != nameof(UsenetDownloadProtocol))
             {
                 return 0;
             }
