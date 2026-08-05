@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Readarr — an ebook and audiobook collection manager for Usenet/BitTorrent. C# / .NET 6 backend
+Readarr — an ebook and audiobook collection manager for Usenet/BitTorrent. C# / .NET 8 backend
 (`src/`) plus a React + Redux frontend (`frontend/`), served as a single self-hosted web app on
 port 8787.
 
@@ -21,14 +21,18 @@ team, and the stated reason matters more than the retirement itself:
 
 Practical consequences:
 
-- **The metadata service is dead.** `src/NzbDrone.Common/Cloud/ReadarrCloudRequestBuilder.cs`
-  hardcodes `https://api.bookinfo.club/v1/{route}` in its constructor. There is **no config or
-  environment override** — pointing at a replacement currently requires a code change (or DNS/hosts
-  interception). The community mirror named in the README is
-  [rreading-glasses](https://github.com/blampe/rreading-glasses). Adding a proper config hook for
-  the metadata base URL is the highest-value first change.
-- Without working metadata, author/book lookup, `RefreshAuthor` and import-list sync all fail. Any
-  refactor that can't be tested against a metadata source will be hard to validate end to end.
+- **The upstream metadata service is dead, but this fork has a working replacement.**
+  `api.bookinfo.club` is gone. `src/NzbDrone.Common/Cloud/ReadarrCloudRequestBuilder.cs` still holds
+  it as the default, now overridable via `Readarr__Metadata__Source` (or `Metadata/Source` in
+  config.xml). The stack runs [rreading-glasses](https://github.com/blampe/rreading-glasses) —
+  Goodreads flavour, no API key — and author/book lookup is verified working against it.
+  **There is no `/v1` prefix**: rreading-glasses serves `/author/{id}` and `/work/{id}` at the root,
+  and `/v1/...` silently returns its Swagger HTML with a 200 rather than a 404.
+- A second, separate override already existed: `ConfigService.MetadataSource`, settable in the UI at
+  `/settings/development`, which `MetadataRequestBuilder` appends `/{route}` to.
+- **Book/title search bypasses both.** `MetadataSource/GoodreadsSearchProxy/GoodreadsSearchProxy.cs`
+  hardcodes `https://www.goodreads.com/book/auto_complete` with a spoofed browser User-Agent and has
+  no config hook at all.
 - Nothing upstream will be merged back, so there is no need to keep changes upstream-shaped. This is
   the opposite of the sibling Lidarr fork (see below).
 
@@ -37,23 +41,45 @@ Practical consequences:
 `../Liedarr` is a Lidarr fork worked on in parallel. Lidarr and Readarr are both Sonarr forks and
 share most infrastructure verbatim, so fixes usually port with only entity renames
 (Artist→Author, Album→Book, Track→Edition/BookFile). Two differences are load-bearing and are
-called out in the sections below: Readarr is on .NET 6 (Lidarr is on 8), and Readarr still has the
-`DownloadProtocol` **enum** where Lidarr has a pluggable marker interface.
+called out in the sections below: Readarr uses the older `System.Data.SQLite.Core.Servarr` provider
+that needs a *system* libsqlite3, and Readarr still has the `DownloadProtocol` **enum** where Lidarr
+has a pluggable marker interface. Both forks are now on .NET 8.
 
 ## Commands
 
 Same shape as Lidarr/Sonarr. Node 20 (pinned via volta to 20.11.1) and Yarn via `corepack enable`.
-There is **no `global.json`**, so the SDK is not pinned — but projects target `net6.0`, which is
-**out of support** (EOL Nov 2024). A newer SDK will build it, but expect analyzer and dependency
-friction; migrating to .NET 8 is a natural early task.
+Projects target **`net8.0`** (migrated from the EOL `net6.0`). There is deliberately **no
+`global.json`**: without one the SDK 8.0 image builds it and a newer local SDK still can, whereas
+pinning to 8.0.x the way Lidarr does breaks local builds on machines without that exact SDK band.
 
 ### Backend
 
 ```bash
 ./build.sh --all                          # backend + frontend + lint + packages
-./build.sh --backend -f net6.0 -r linux-x64
+./build.sh --backend -f net8.0 -r linux-x64
 dotnet msbuild -restore src/Readarr.sln -p:Configuration=Debug -p:Platform=Posix -t:PublishAllRids
 ```
+
+### Docker
+
+`Dockerfile` (multi-stage, self-contained publish) builds the image the compose stack at
+`C:\Users\dood3\dockerComPlex\docker-compose.yml` runs as `readarr:local`:
+
+```bash
+docker build -t readarr:local .          # production image
+docker build --target test .             # build, then run the unit suite
+```
+
+Two things in it are load-bearing and easy to break:
+
+- **`libsqlite3-0` must be apt-installed.** `AssemblyLoader.LoadSqliteNativeLib` maps `sqlite3` to
+  the *system* `libsqlite3.so.0` on Linux and `System.Data.SQLite.Core.Servarr` 1.0.115.5-18 bundles
+  no native, so without it Readarr dies on "Error creating main database". The Lidarr fork needs no
+  such package because its newer provider bundles `libe_sqlite3.so` — don't copy its apt list.
+- **`AssemblyVersion` must be substituted.** `Directory.Build.props` ships `10.0.0.*`, and
+  `RuntimeInfo.InternalIsOfficialBuild()` treats `Major >= 10` as unofficial, which makes
+  `CacheableSpecification` mark every response no-cache and re-download the UI bundle on each page
+  load.
 
 Output goes to `_output/`, tests to `_tests/`, intermediates to `_temp/`, packages to `_artifacts/`.
 `build.sh` accepts `--all --backend --frontend --packages --lint --installer
@@ -192,7 +218,7 @@ with entity renames.
   don't bolt a third enum value on.
 - **Audiobookshelf as the frontend** means Readarr's own UI matters less than its API. Favour
   keeping `Readarr.Api.V1` stable and well-formed over UI polish.
-- **.NET 6 is EOL.** Upgrading to .NET 8 aligns with the Lidarr fork and unblocks current tooling.
+- ~~.NET 6 is EOL.~~ Done — the fork is on .NET 8, matching Lidarr.
 
 ## Conventions
 
