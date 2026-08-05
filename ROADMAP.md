@@ -63,6 +63,31 @@ No `global.json` was added. Without one, the SDK 8.0 image builds it and a newer
 can; pinning to 8.0.x the way Lidarr does would break local builds on any machine without that
 exact SDK band.
 
+## Library scan results (real library, S:\My Books)
+
+2150 files / 30.5 GB, of which 1868 are media. After a full scan against the Open Library provider:
+
+- **12 authors identified**, 12 files imported, **1638 files unmapped**
+- The library was untouched — byte-for-byte identical before and after (`renameBooks` and
+  `deleteEmptyFolders` are both off, so Readarr only reads)
+
+Where the unmapped files are:
+
+| Folder | Files |
+|---|---|
+| `Tolkien Lord Of The Rings Hobbit audiobook Rob Inglis 56 CD MP3` | 1310 |
+| `J K Rowling - Harry Potter 1-7 Unabridged Audiobooks Narrated by Jim Dale` | 199 |
+| `podcast` | 104 |
+| `Frank Herbert` | 14 |
+| `The Black Magician Trilogy by Trudi Canavan [EPUB] [MOBI]` | 4 |
+
+1613 of 1638 are the three raw release folders plus `podcast/` — release names never filed under an
+author, so there is no author folder to match against. Only ~16 files inside correctly named author
+folders failed to map, and those are multi-file mp3 audiobooks.
+
+This is step 5's problem, not a metadata problem: `podcast/` should be excluded from the root folder
+outright, and the three release folders need manual author assignment before any rename pass.
+
 ## The user's actual library
 
 `S:\My Books`, bind-mounted as `/books`. Roughly 9 top-level entries, mixed conventions.
@@ -134,33 +159,27 @@ Things worth knowing before step 3:
 - A new protocol needs a `DelayProfileProtocolItem` in `DelayProfile`'s constructor, or it will not
   be allowed by default and releases will be silently rejected by `ProtocolSpecification`.
 
-### 3. Port the slskd indexer and download client
+### 3. ~~Port the slskd indexer and download client~~ — DONE
 
-From `../Liedarr` branch `feature/slskd-indexer-and-download-client`, commit `3dabaab6b`:
+Soulseek is a third protocol. Adding `SoulseekDownloadProtocol` was one class; the indexer and
+download client needed only entity renames from the Lidarr port.
 
-| Lidarr file | Readarr equivalent |
-|---|---|
-| `Indexers/Slskd/SlskdResource.cs` | same, unchanged |
-| `Indexers/Slskd/SlskdProxy.cs` | same, unchanged |
-| `Indexers/Slskd/SlskdIndexerSettings.cs` | same, extensions default to `epub,mobi,azw3,m4b,mp3,m4a,flac` |
-| `Indexers/Slskd/SlskdIndexer.cs` | Album/Artist criteria → Book/Author criteria |
-| `Download/Clients/Slskd/*` | same, unchanged |
-| `ProcessDownloadDecisions.cs` | same `HashSet<string> failedProtocols` change |
-| `frontend/.../ProtocolLabel.*` | same, plus the `styles[protocol]` lookup bug is present here too |
+Two things a third protocol needed that were not obvious:
 
-Verified slskd API facts (against slskd 0.26.0.0):
+- **`DelayProfileService.AddMissingItems`** reconciles stored profiles against registered protocols.
+  Without it a protocol added after a profile was saved is absent from `Items`, `IsAllowedProtocol`
+  returns false, and `ProtocolSpecification` rejects every release on it with no visible cause.
+- **`ProcessDownloadDecisions`** tracked failure with a bool per protocol; now a `HashSet<string>`.
 
-- `POST /api/v0/searches` `{id, searchText}` → `GET /api/v0/searches/{id}` until `isComplete` →
-  `GET /api/v0/searches/{id}/responses`
-- A response is per **peer**: `username, queueLength, uploadSpeed, hasFreeUploadSlot, files[]`
-- A file is `filename` (backslash-separated), `size`, `length`, `bitDepth`, `sampleRate`, `isLocked`
-- Soulseek has no concept of a release, so the indexer groups a peer's files by parent folder
-- `POST /api/v0/transfers/downloads/{username}` enqueues; `GET /api/v0/transfers/downloads` lists
-- Searching works with a `readonly` API key; **enqueuing needs `readwrite`**
+Settings are retuned for books: extensions default to `epub,mobi,azw3,pdf,m4b,mp3,m4a,flac` and
+`MinimumFileCount` is 1, since an ebook is a single file where an album is not.
 
-Readarr-specific wrinkle: a Soulseek folder may contain the epub *and* the m4b. Decide whether that
-is one grab producing two editions, or whether the indexer emits separate releases per format. This
-interacts directly with step 4.
+Verified against slskd 0.26.0.0 on the live stack: both connectivity tests pass and an interactive
+search for "Children of Dune" returned 139 releases including M4B audiobooks.
+
+**Known tuning issue:** because `mp3` and `flac` are allowed (needed for mp3 audiobooks), a search
+also returns music that merely matches the title — the Brian Tyler *Children of Dune* soundtrack
+came back as FLAC albums. Worth a book-oriented filter, or dropping `flac` from the default.
 
 ### 4. Audiobook vs ebook as a first-class distinction — partly done
 
