@@ -191,7 +191,19 @@ Readarr-specific wrinkle: a Soulseek folder may contain the epub *and* the m4b. 
 is one grab producing two editions, or whether the indexer emits separate releases per format. This
 interacts directly with step 4.
 
-### 4. Audiobook vs ebook as a first-class distinction
+### 4. Audiobook vs ebook as a first-class distinction — partly done
+
+`Edition` already had `IsEbook` and `Format`, and the Open Library/Audible provider now populates
+both: text editions from Open Library carry `IsEbook = true`, Audible editions carry
+`IsEbook = false` and `Format = "Audiobook"` with the narrators in `Disambiguation`. A book with both
+an epub and an m4b - exactly the user's folder layout - now models as one `Book` with two `Edition`
+rows that can be told apart.
+
+What is still missing is option **b** below: letting quality profiles and monitoring *target* a
+media type, so "monitor audiobooks only for this author" becomes expressible. The data is there now;
+the profile/monitoring surface is not.
+
+Original options, for reference:
 
 Options, roughly increasing in cost:
 
@@ -227,7 +239,75 @@ parse those as books.
 
 Flagging rather than deciding: this reverses the literal instruction, so confirm before acting.
 
-## Metadata: the elephant
+## Metadata: resolved, in-process
+
+**There is no metadata sidecar any more.** rreading-glasses and its Postgres have been removed from
+the compose stack. Readarr resolves metadata itself:
+
+| Concern | Source |
+|---|---|
+| Author identity, bibliography | Open Library `/authors/{key}` + `/search.json?author_key=` |
+| Text editions, ISBNs, covers, page counts | Open Library `/works/{key}/editions.json` |
+| Audiobook editions, narrators, runtime | Audible `catalog/products` |
+| Series and sequence | Audible (`("Dune", 3)`) |
+
+Neither needs an API key. Google Books was rejected: it returns HTTP 429 unauthenticated.
+
+### Shape
+
+The five metadata interfaces (`IProvideAuthorInfo`, `IProvideBookInfo`, `ISearchForNewAuthor`,
+`ISearchForNewBook`, `ISearchForNewEntity`) are served by a single `BookMetadataProxy` facade, which
+dispatches to an `IBookMetadataProvider` chosen by the `MetadataProvider` config setting
+(`OpenLibrary` default, `BookInfo` for a bookinfo.club-compatible server such as rreading-glasses).
+
+**Only one class may implement those five interfaces.** Composition registers every interface as a
+singleton with a single default, so a second implementation makes resolution ambiguous and the
+container throws at startup. New backends implement `IBookMetadataProvider` instead.
+
+Three properties of the existing code made this tractable, contrary to the earlier assumption that a
+replacement would have to speak the bookinfo schema:
+
+- The interfaces are written in Readarr's own domain types, not the wire schema.
+- All foreign IDs are `string` and nothing parses them as ints, so `OL79034A` needs no schema change.
+- `GetChangedAuthors` may return `null`, which makes `RefreshAuthorService` fall back to its own
+  `ShouldRefresh` heuristic. No change-feed endpoint is required.
+
+`IProvideSeriesInfo` and `IProvideListInfo` are *not* part of this path — they belong to the
+Goodreads import lists and are implemented by `GoodreadsProxy`.
+
+### Traps found while building it
+
+- **`MinPopularity` is provider-relative.** `Ratings.Popularity` is `Votes * Value`, and Open Library
+  reports tens of ratings where Goodreads reports tens of thousands. The stock default of 350 filters
+  out essentially an author's whole catalogue on Open Library data. The seeded default is now chosen
+  from the configured provider (`OPEN_LIBRARY_DEFAULT_MIN_POPULARITY = 20`). Existing profiles are
+  untouched, so an install created before this needs its profile lowered by hand.
+- **Open Library's `language` is a work-level aggregate in arbitrary order.** Children of Dune leads
+  with `pol`, Heretics with `rus`. Taking the first entry made the synthetic text edition look
+  Polish, and the default `eng, null` profile then deleted it - leaving books with only an Audible
+  audiobook. `PreferredLanguage` picks `eng` when the work has an English edition at all.
+- **Author search ranks badly.** A query for "Frank Herbert" returns "Frank Herbert Hayward" and
+  "Simonds, Frank Herbert" above the real one. `RankAuthors` re-sorts on exact match, then prefix,
+  then work count.
+- Audible enrichment is strictly best-effort. It is an undocumented app API; every failure degrades
+  to "no audiobook data" rather than failing the lookup.
+
+### Verified end to end
+
+On a from-scratch install with an empty config directory:
+
+```
+seeded minPopularity              20         (provider-aware)
+author lookup "Frank Herbert"     OL79034A ranked first
+add author + RefreshAuthor        8 books persisted
+editions                          every book has a text edition; 5 of 8 also have an audiobook
+monitored edition                 the text one (Format "Book")
+series                            Dune (positions 3-6), The Dune Sequence (14-17)
+```
+
+`OpenLibraryProviderFixture` covers this against the live APIs (16 tests).
+
+## Appendix: the old sidecar approach
 
 Now stood up and answering. rreading-glasses (Goodreads flavour, `blampe/rreading-glasses:latest`
 with `--upstream=www.goodreads.com`) needs **no API key** — only a Postgres to cache into. The

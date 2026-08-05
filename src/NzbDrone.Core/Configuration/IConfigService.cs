@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NzbDrone.Common.Http.Proxy;
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Security;
 
@@ -67,6 +68,7 @@ namespace NzbDrone.Core.Configuration
 
         //Metadata
         string MetadataSource { get; set; }
+        MetadataProviderType MetadataProvider { get; set; }
         WriteAudioTagsType WriteAudioTags { get; set; }
         bool ScrubAudioTags { get; set; }
         WriteBookTagsType WriteBookTags { get; set; }

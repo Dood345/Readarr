@@ -6,10 +6,12 @@ using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Books.Calibre;
+using NzbDrone.Core.Configuration;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Profiles.Releases;
 using NzbDrone.Core.RootFolders;
 
@@ -31,6 +33,14 @@ namespace NzbDrone.Core.Profiles.Metadata
         public const string NONE_PROFILE_NAME = "None";
         public const double NONE_PROFILE_MIN_POPULARITY = 1e10;
 
+        // Popularity is Ratings.Votes * Ratings.Value, so the threshold is only meaningful relative
+        // to how many ratings a given metadata source carries. Goodreads reports tens of thousands
+        // of votes per popular book; Open Library reports tens. Frank Herbert's "Children of Dune"
+        // scores ~186 on Open Library data and ~350000 on Goodreads data, so a single default
+        // silently imports everything or nothing depending on the provider.
+        public const double GOODREADS_DEFAULT_MIN_POPULARITY = 350;
+        public const double OPEN_LIBRARY_DEFAULT_MIN_POPULARITY = 20;
+
         private static readonly Regex PartOrSetRegex = new Regex(@"(?<from>\d+) of (?<to>\d+)|(?<from>\d+)\s?/\s?(?<to>\d+)|(?<from>\d+)\s?-\s?(?<to>\d+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -42,6 +52,7 @@ namespace NzbDrone.Core.Profiles.Metadata
         private readonly IImportListFactory _importListFactory;
         private readonly IRootFolderService _rootFolderService;
         private readonly ITermMatcherService _termMatcherService;
+        private readonly IConfigService _configService;
         private readonly Logger _logger;
 
         public MetadataProfileService(IMetadataProfileRepository profileRepository,
@@ -52,8 +63,10 @@ namespace NzbDrone.Core.Profiles.Metadata
                                       IImportListFactory importListFactory,
                                       IRootFolderService rootFolderService,
                                       ITermMatcherService termMatcherService,
+                                      IConfigService configService,
                                       Logger logger)
         {
+            _configService = configService;
             _profileRepository = profileRepository;
             _authorService = authorService;
             _bookService = bookService;
@@ -282,7 +295,9 @@ namespace NzbDrone.Core.Profiles.Metadata
                 Add(new MetadataProfile
                 {
                     Name = "Standard",
-                    MinPopularity = 350,
+                    MinPopularity = _configService.MetadataProvider == MetadataProviderType.OpenLibrary
+                        ? OPEN_LIBRARY_DEFAULT_MIN_POPULARITY
+                        : GOODREADS_DEFAULT_MIN_POPULARITY,
                     SkipMissingDate = true,
                     SkipPartsAndSets = true,
                     AllowedLanguages = "eng, null"

@@ -9,6 +9,7 @@ using NzbDrone.Core.Configuration.Events;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Security;
 
@@ -267,6 +268,13 @@ namespace NzbDrone.Core.Configuration
             get { return GetValue("MetadataSource", ""); }
 
             set { SetValue("MetadataSource", value); }
+        }
+
+        public MetadataProviderType MetadataProvider
+        {
+            get { return GetValueEnum("MetadataProvider", MetadataProviderType.OpenLibrary); }
+
+            set { SetValue("MetadataProvider", value); }
         }
 
         public WriteAudioTagsType WriteAudioTags

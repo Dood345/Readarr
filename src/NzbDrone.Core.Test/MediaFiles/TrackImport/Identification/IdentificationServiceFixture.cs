@@ -57,8 +57,19 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
             Mocker.SetConstant<IMediaFileService>(Mocker.Resolve<MediaFileService>());
 
             Mocker.SetConstant<IConfigService>(Mocker.Resolve<IConfigService>());
-            Mocker.SetConstant<IProvideAuthorInfo>(Mocker.Resolve<BookInfoProxy>());
-            Mocker.SetConstant<IProvideBookInfo>(Mocker.Resolve<BookInfoProxy>());
+
+            // The metadata interfaces are served by BookMetadataProxy now, which dispatches on the
+            // MetadataProvider setting. This fixture's cached fixtures are bookinfo-shaped, so pin
+            // it to that provider rather than the OpenLibrary default.
+            Mocker.GetMock<IConfigService>().SetupGet(x => x.MetadataProvider).Returns(MetadataProviderType.BookInfo);
+
+            var metadataProxy = new BookMetadataProxy(
+                new IBookMetadataProvider[] { Mocker.Resolve<BookInfoProxy>() },
+                Mocker.Resolve<IConfigService>(),
+                TestLogger);
+
+            Mocker.SetConstant<IProvideAuthorInfo>(metadataProxy);
+            Mocker.SetConstant<IProvideBookInfo>(metadataProxy);
 
             _addAuthorService = Mocker.Resolve<AddAuthorService>();
 

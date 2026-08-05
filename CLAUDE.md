@@ -21,18 +21,18 @@ team, and the stated reason matters more than the retirement itself:
 
 Practical consequences:
 
-- **The upstream metadata service is dead, but this fork has a working replacement.**
-  `api.bookinfo.club` is gone. `src/NzbDrone.Common/Cloud/ReadarrCloudRequestBuilder.cs` still holds
-  it as the default, now overridable via `Readarr__Metadata__Source` (or `Metadata/Source` in
-  config.xml). The stack runs [rreading-glasses](https://github.com/blampe/rreading-glasses) —
-  Goodreads flavour, no API key — and author/book lookup is verified working against it.
-  **There is no `/v1` prefix**: rreading-glasses serves `/author/{id}` and `/work/{id}` at the root,
-  and `/v1/...` silently returns its Swagger HTML with a 200 rather than a 404.
-- A second, separate override already existed: `ConfigService.MetadataSource`, settable in the UI at
-  `/settings/development`, which `MetadataRequestBuilder` appends `/{route}` to.
-- **Book/title search bypasses both.** `MetadataSource/GoodreadsSearchProxy/GoodreadsSearchProxy.cs`
-  hardcodes `https://www.goodreads.com/book/auto_complete` with a spoofed browser User-Agent and has
-  no config hook at all.
+- **The upstream metadata service is dead; this fork resolves metadata in-process instead.**
+  `api.bookinfo.club` is gone and there is **no sidecar container**. `MetadataSource/OpenLibrary/`
+  supplies author identity, bibliography and text editions from Open Library, and
+  `MetadataSource/Audible/` adds audiobook editions, narrators and series sequence. Neither needs an
+  API key. See the "Metadata providers" section below.
+- The old path still exists as a config option (`MetadataProvider=BookInfo`) for anyone pointing at
+  a bookinfo.club-compatible server such as rreading-glasses, via `Readarr__Metadata__Source` or
+  `ConfigService.MetadataSource` (settable in the UI at `/settings/development`).
+- **Book/title search under the BookInfo provider bypasses both.**
+  `MetadataSource/GoodreadsSearchProxy/GoodreadsSearchProxy.cs` hardcodes
+  `https://www.goodreads.com/book/auto_complete` with a spoofed browser User-Agent and has no config
+  hook. The OpenLibrary provider does not use it.
 - Nothing upstream will be merged back, so there is no need to keep changes upstream-shaped. This is
   the opposite of the sibling Lidarr fork (see below).
 
@@ -171,6 +171,41 @@ edition; one is monitored) → **BookFile**. Separately, **Series** ↔ **Book**
 `SeriesBookLink`.
 
 Refresh logic is in `Books/Services/Refresh*Service.cs` over a shared `RefreshEntityServiceBase`.
+
+### Metadata providers
+
+`src/NzbDrone.Core/MetadataSource/`. The five interfaces — `IProvideAuthorInfo`, `IProvideBookInfo`,
+`ISearchForNewAuthor`, `ISearchForNewBook`, `ISearchForNewEntity` — are served by **one** class,
+`BookMetadataProxy`, which dispatches to an `IBookMetadataProvider` selected by the
+`MetadataProvider` config setting (`OpenLibrary` default, or `BookInfo`).
+
+**Never add a second implementation of those five interfaces.** Composition registers every
+interface as a singleton with a single default (`Composition/Extensions.cs`), so a second one makes
+resolution ambiguous and the container throws at startup. Implement `IBookMetadataProvider`; the
+facade resolves them as `IEnumerable<IBookMetadataProvider>`.
+
+Notes that are easy to get wrong:
+
+- **`MinPopularity` is provider-relative.** `Ratings.Popularity` is `Votes * Value`. Goodreads
+  reports tens of thousands of votes; Open Library reports tens. The stock default of 350 filters
+  out an author's entire catalogue on Open Library data, silently — books simply never appear.
+  `MetadataProfileService` seeds the default from the configured provider.
+- **Open Library's search `language` field is a work-level aggregate in arbitrary order** — not the
+  language of any one edition. Use `PreferredLanguage`, not `First()`.
+- **Open Library author search ranks poorly** and is re-sorted by `RankAuthors`.
+- **Audible is an undocumented app API.** All enrichment is best-effort and must degrade to "no
+  audiobook data" rather than failing a lookup.
+- `IProvideSeriesInfo`/`IProvideListInfo` are *not* part of this path — they belong to the Goodreads
+  import lists and are implemented by `GoodreadsProxy`.
+
+### API controllers
+
+**POST/PUT actions must carry `[FromBody]` explicitly.** `V1ApiControllerAttribute` implements
+`IApiBehaviorMetadata`, but binding-source inference does not fire for it on .NET 8, so a complex
+parameter without the attribute binds from form/query and silently arrives as a default instance —
+every write then fails FluentValidation with "must not be empty" and a null `propertyValue`, which
+looks like a client bug rather than a server one. `ProviderControllerBase` already had it; the other
+33 actions did not until this fork added them.
 
 ### Calibre
 
