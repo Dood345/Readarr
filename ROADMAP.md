@@ -216,18 +216,19 @@ Recommend **b**, with **a** as the migration path to populate it.
 Do not mass-rename without a preview run; three existing top-level folders are raw release names and
 will need manual author assignment first.
 
-## Podcasts: recommendation
+## Podcasts: resolved
 
-The instruction was "forget about podcasts entirely if Lidarr already supports them". It does not —
-there are **zero** podcast references in either Lidarr or Readarr source.
+Moved `S:\My Books\podcast` to `S:\Podcasts` (110 files, 7.3 GB, 8 shows) and mounted it into
+Audiobookshelf as `/podcasts`. Readarr's unmapped count dropped 1638 -> 1534 and no podcast entries
+remain.
 
-Recommend leaving podcasts to Audiobookshelf regardless. It has native podcast support (search,
-RSS subscription, scheduled episode download), the user's `S:\My Books\podcast\` tree is already
-laid out the way Audiobookshelf expects, and building a parallel podcast pipeline into Readarr would
-duplicate a solved problem. Keep `podcast/` excluded from Readarr's root folder so it never tries to
-parse those as books.
+Worth knowing: Audiobookshelf had only **one** library, "Books" at `/books`, so it was scanning those
+podcast episodes as books too. The move fixes both. Add a Podcasts library in the Audiobookshelf UI
+pointing at `/podcasts` to get its native podcast handling.
 
-Flagging rather than deciding: this reverses the literal instruction, so confirm before acting.
+Readarr has no per-folder exclusion. `DiskScanService.ExcludedSubFoldersRegex` skips `extras`,
+`@eadir`, `extrafanart`, `plex versions` and anything starting with a dot - so a dot-prefixed folder
+would also have worked, but that would have hidden it from Audiobookshelf as well.
 
 ## Metadata: resolved, in-process
 
