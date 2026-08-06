@@ -31,12 +31,15 @@ namespace NzbDrone.Core.Profiles.Metadata
         public const string NONE_PROFILE_NAME = "None";
         public const double NONE_PROFILE_MIN_POPULARITY = 1e10;
 
-        // Popularity is Ratings.Votes * Ratings.Value, so the threshold is only meaningful relative
-        // to how many ratings the metadata source carries. Upstream's 350 was calibrated for
-        // Goodreads, which reports tens of thousands of votes per popular book. Open Library reports
-        // tens - Frank Herbert's "Children of Dune" scores ~186 there - so 350 silently discarded
-        // an author's entire catalogue with no error.
-        public const double DEFAULT_MIN_POPULARITY = 20;
+        // Popularity is Ratings.Votes * Ratings.Value, which only works if the metadata source
+        // reports ratings consistently. Open Library does not: "Dune" carries 160 editions and
+        // *zero* ratings, as does "Dune Messiah", while "Children of Dune" has 47. Any threshold
+        // above zero silently removes the most famous books in a bibliography and leaves the
+        // sequels, which is exactly what happened here.
+        //
+        // Duplicate and omnibus records - the noise this filter was really guarding against - are
+        // removed by the provider instead, where edition counts make that judgement reliably.
+        public const double DEFAULT_MIN_POPULARITY = 0;
 
         private static readonly Regex PartOrSetRegex = new Regex(@"(?<from>\d+) of (?<to>\d+)|(?<from>\d+)\s?/\s?(?<to>\d+)|(?<from>\d+)\s?-\s?(?<to>\d+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
