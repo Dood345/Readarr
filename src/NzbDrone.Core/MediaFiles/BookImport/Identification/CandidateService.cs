@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
@@ -23,6 +26,8 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
         private readonly IEditionService _editionService;
         private readonly IMediaFileService _mediaFileService;
         private readonly Logger _logger;
+
+        private static readonly Regex SeriesPrefixRegex = new Regex(@"^.*\d[\d.]*\s*-\s*(?<title>.+)$", RegexOptions.Compiled);
 
         public CandidateService(ISearchForNewBook bookSearchService,
                                 IAuthorService authorService,
@@ -138,8 +143,9 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             _logger.Trace("Getting candidates for {0}", author);
             var candidateReleases = new List<CandidateEdition>();
 
-            var bookTag = localEdition.LocalBooks.MostCommon(x => x.FileTrackInfo.BookTitle) ?? "";
-            if (bookTag.IsNotNullOrWhiteSpace())
+            // The album tag is the usual source for the title, but a chapter-per-file audiobook
+            // often has no tags at all, so the containing folder is tried as well.
+            foreach (var bookTag in GetBookTitleCandidates(localEdition))
             {
                 var possibleBooks = _bookService.GetCandidates(author.AuthorMetadataId, bookTag);
                 foreach (var book in possibleBooks)
@@ -188,7 +194,103 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 }
             }
 
+            // Audiobooks are frequently untaggable in practice: a chapter-per-file rip often has
+            // empty tags entirely, and many carry the *narrator* in the artist field rather than
+            // the author. In a library laid out as <root>/<Author>/<Book>/files the path is the
+            // more reliable signal, so it is used in addition to the tags rather than only as a
+            // fallback - a wrong tag would otherwise win over a correct folder.
+            foreach (var name in GetPathNameCandidates(localEdition))
+            {
+                foreach (var author in _authorService.GetCandidates(name))
+                {
+                    candidateReleases.AddRange(GetDbCandidatesByAuthor(localEdition, author, includeExisting));
+                }
+            }
+
             return candidateReleases;
+        }
+
+        /// <summary>
+        /// Titles worth trying for the book, most trustworthy first: the album tag, then the name
+        /// of the folder holding the files.
+        /// </summary>
+        private static List<string> GetBookTitleCandidates(LocalEdition localEdition)
+        {
+            var candidates = new List<string>();
+
+            var bookTag = localEdition.LocalBooks.MostCommon(x => x.FileTrackInfo.BookTitle) ?? "";
+
+            if (bookTag.IsNotNullOrWhiteSpace())
+            {
+                candidates.Add(bookTag);
+            }
+
+            foreach (var name in GetPathNameCandidates(localEdition))
+            {
+                Add(candidates, name);
+
+                // A folder named "<Series> <position> - <Title>" is a common convention, and this
+                // library uses it throughout ("Dune 0.1 - The Butlerian Jihad"). Offer the title on
+                // its own as well, otherwise "The Lord of the Rings 1 - The Fellowship of the Ring"
+                // scores against the omnibus "The Lord of the Rings" rather than the actual book.
+                Add(candidates, StripSeriesPrefix(name));
+            }
+
+            return candidates;
+        }
+
+        private static void Add(List<string> candidates, string value)
+        {
+            if (value.IsNotNullOrWhiteSpace() && !candidates.Contains(value, StringComparer.InvariantCultureIgnoreCase))
+            {
+                candidates.Add(value);
+            }
+        }
+
+        /// <summary>
+        /// Returns the part after the separator when a folder is named "&lt;Series&gt; &lt;position&gt; - &lt;Title&gt;",
+        /// otherwise null. The position is what distinguishes this from a title that merely
+        /// contains a dash, so a digit is required before the separator.
+        /// </summary>
+        private static string StripSeriesPrefix(string name)
+        {
+            var match = SeriesPrefixRegex.Match(name ?? string.Empty);
+
+            return match.Success ? match.Groups["title"].Value.Trim() : null;
+        }
+
+        /// <summary>
+        /// Folder names above the files, nearest first. For &lt;root&gt;/&lt;Author&gt;/&lt;Book&gt;/file.mp3 that is
+        /// the book folder then the author folder, which covers both that layout and the flatter
+        /// &lt;root&gt;/&lt;Author&gt;/file.epub one without needing to know where the root is.
+        /// </summary>
+        private static List<string> GetPathNameCandidates(LocalEdition localEdition)
+        {
+            var names = new List<string>();
+
+            foreach (var track in localEdition.LocalBooks)
+            {
+                if (track.Path.IsNullOrWhiteSpace())
+                {
+                    continue;
+                }
+
+                var dir = Path.GetDirectoryName(track.Path);
+
+                for (var i = 0; i < 2 && dir.IsNotNullOrWhiteSpace(); i++)
+                {
+                    var name = Path.GetFileName(dir);
+
+                    if (name.IsNotNullOrWhiteSpace() && !names.Contains(name, StringComparer.InvariantCultureIgnoreCase))
+                    {
+                        names.Add(name);
+                    }
+
+                    dir = Path.GetDirectoryName(dir);
+                }
+            }
+
+            return names;
         }
 
         public IEnumerable<CandidateEdition> GetRemoteCandidates(LocalEdition localEdition, IdentificationOverrides idOverrides)
