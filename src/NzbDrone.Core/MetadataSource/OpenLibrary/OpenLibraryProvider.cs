@@ -525,7 +525,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                     Title = doc.Title,
                     Isbn13 = doc.Isbn?.FirstOrDefault(x => x != null && x.Length == 13),
                     Language = PreferredLanguage(doc.Language),
-                    Format = "Book",
+                    Format = "ebook",
                     IsEbook = true,
                     PageCount = doc.NumberOfPagesMedian ?? 0,
                     ReleaseDate = book.ReleaseDate,
@@ -583,7 +583,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 Language = resource.Languages?.FirstOrDefault()?.Key is string lang
                     ? OpenLibraryProxy.NormalizeKey(lang)
                     : null,
-                Format = resource.PhysicalFormat ?? "Book",
+                Format = resource.PhysicalFormat ?? "ebook",
                 IsEbook = true,
                 Disambiguation = resource.Subtitle,
                 Images = CoverImages(resource.Covers?.FirstOrDefault()),
