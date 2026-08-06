@@ -212,7 +212,15 @@ namespace NzbDrone.Core.Books
 
             // Update book ids for trackfiles
             var files = _mediaFileService.GetFilesByBook(local.Id);
-            files.ForEach(x => x.EditionId = target.Editions.Value.Single(e => e.Monitored).Id);
+
+            // Move each file onto a monitored edition of its own media type where one exists, so an
+            // audiobook does not get reparented onto the ebook edition during a merge.
+            var fallbackEdition = target.Editions.Value.PrimaryEdition();
+            files.ForEach(x =>
+            {
+                var match = target.Editions.Value.MonitoredEditionFor(x.Quality.Quality.MediaType());
+                x.EditionId = (match ?? fallbackEdition).Id;
+            });
             _mediaFileService.Update(files);
 
             // Update book ids for history
@@ -309,7 +317,7 @@ namespace NzbDrone.Core.Books
             children.UpToDate = children.UpToDate.Except(extraToUpdate).ToList();
             children.Updated.AddRange(extraToUpdate);
 
-            Debug.Assert(!children.Future.Any() || children.Future.Count(x => x.Monitored) == 1, "one edition monitored");
+            Debug.Assert(!children.Future.Any() || children.Future.Where(x => x.Monitored).GroupBy(x => x.MediaType()).All(g => g.Count() == 1), "at most one monitored edition per media type");
         }
 
         protected override bool RefreshChildren(SortedChildren localChildren, List<Edition> remoteChildren, Author remoteData, bool forceChildRefresh, bool forceUpdateFileTags, DateTime? lastUpdate)

@@ -80,17 +80,43 @@ namespace NzbDrone.Core.IndexerSearch
         {
             var author = _authorService.GetAuthor(book.AuthorId);
 
-            var searchSpec = Get<BookSearchCriteria>(author, new List<Book> { book }, userInvokedSearch, interactiveSearch);
+            // A book may monitor an ebook edition and an audiobook edition at once. Their titles can
+            // differ (an audiobook is often "... (Unabridged)"), so search once per distinct title
+            // rather than picking one edition and missing the other format entirely.
+            var titles = book.Editions.Value.MonitoredEditions()
+                .Select(x => x.Title)
+                .Where(x => x.IsNotNullOrWhiteSpace())
+                .Distinct()
+                .ToList();
 
-            searchSpec.BookTitle = book.Editions.Value.SingleOrDefault(x => x.Monitored).Title;
-
-            // searchSpec.BookIsbn = book.Isbn13;
-            if (book.ReleaseDate.HasValue)
+            if (!titles.Any())
             {
-                searchSpec.BookYear = book.ReleaseDate.Value.Year;
+                var fallback = book.Editions.Value.PrimaryEdition();
+
+                if (fallback?.Title.IsNotNullOrWhiteSpace() == true)
+                {
+                    titles.Add(fallback.Title);
+                }
             }
 
-            return await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec);
+            var decisions = new List<DownloadDecision>();
+
+            foreach (var title in titles)
+            {
+                var searchSpec = Get<BookSearchCriteria>(author, new List<Book> { book }, userInvokedSearch, interactiveSearch);
+
+                searchSpec.BookTitle = title;
+
+                // searchSpec.BookIsbn = book.Isbn13;
+                if (book.ReleaseDate.HasValue)
+                {
+                    searchSpec.BookYear = book.ReleaseDate.Value.Year;
+                }
+
+                decisions.AddRange(await Dispatch(indexer => indexer.Fetch(searchSpec), searchSpec));
+            }
+
+            return decisions;
         }
 
         private TSpec Get<TSpec>(Author author, List<Book> books, bool userInvokedSearch, bool interactiveSearch)

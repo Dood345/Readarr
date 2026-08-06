@@ -59,7 +59,7 @@ namespace NzbDrone.Core.Books
 
             // Note it's a manual addition so it's not deleted on next refresh
             book.AddOptions.AddType = BookAddType.Manual;
-            book.Editions.Value.Single(x => x.Monitored).ManualAdd = true;
+            book.Editions.Value.MonitoredEditions().ForEach(x => x.ManualAdd = true);
 
             // Add the author if necessary
             var dbAuthor = _authorService.FindById(book.AuthorMetadata.Value.ForeignAuthorId);
@@ -103,7 +103,7 @@ namespace NzbDrone.Core.Books
 
         private Book AddSkyhookData(Book newBook)
         {
-            var editionId = newBook.Editions.Value.Single(x => x.Monitored).ForeignEditionId;
+            var editionIds = newBook.Editions.Value.MonitoredEditions().Select(x => x.ForeignEditionId).ToHashSet();
 
             Tuple<string, Book, List<AuthorMetadata>> tuple = null;
             try
@@ -124,8 +124,17 @@ namespace NzbDrone.Core.Books
             newBook.Added = DateTime.UtcNow;
 
             newBook.Editions = tuple.Item2.Editions.Value;
-            newBook.Editions.Value.ForEach(x => x.Monitored = false);
-            newBook.Editions.Value.Single(x => x.ForeignEditionId == editionId).Monitored = true;
+
+            // Carry the requested editions across the metadata refresh. If none of them survived,
+            // fall back to whatever the provider already marked monitored so the book is not left
+            // with nothing to search for.
+            var carried = newBook.Editions.Value.Where(x => editionIds.Contains(x.ForeignEditionId)).ToList();
+
+            if (carried.Any())
+            {
+                newBook.Editions.Value.ForEach(x => x.Monitored = false);
+                carried.ForEach(x => x.Monitored = true);
+            }
 
             var metadata = tuple.Item3.FirstOrDefault(x => x.ForeignAuthorId == tuple.Item1);
             newBook.AuthorMetadata = metadata;

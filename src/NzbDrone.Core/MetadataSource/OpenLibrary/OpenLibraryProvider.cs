@@ -540,7 +540,9 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         }
 
         /// <summary>
-        /// Readarr requires exactly one monitored edition per book.
+        /// Monitors the best edition of each media type, so a book that exists as both an epub and
+        /// an audiobook tracks both rather than forcing a choice. Readarr allows one monitored
+        /// edition per media type.
         /// </summary>
         private static void FinaliseEditions(Book book, List<Edition> editions)
         {
@@ -556,12 +558,18 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 edition.Monitored = false;
             }
 
-            // Prefer a text edition with an ISBN, then anything text, then whatever exists.
-            var preferred = editions.FirstOrDefault(x => x.IsEbook && x.Isbn13.IsNotNullOrWhiteSpace())
-                            ?? editions.FirstOrDefault(x => x.IsEbook)
-                            ?? editions.First();
+            foreach (var group in editions.GroupBy(x => x.MediaType()))
+            {
+                // Within text editions prefer one with an ISBN, since that is what identification
+                // and most indexers can actually match on.
+                var best = group.FirstOrDefault(x => x.Isbn13.IsNotNullOrWhiteSpace())
+                           ?? group.FirstOrDefault(x => x.Asin.IsNotNullOrWhiteSpace())
+                           ?? group.First();
 
-            preferred.Monitored = true;
+                best.Monitored = true;
+            }
+
+            var preferred = editions.PrimaryEdition();
 
             if (book.Title.IsNullOrWhiteSpace())
             {
