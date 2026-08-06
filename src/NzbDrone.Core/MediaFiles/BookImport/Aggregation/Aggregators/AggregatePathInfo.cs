@@ -1,4 +1,7 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Parser.Model;
@@ -51,13 +54,20 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators
                 }
             }
 
-            if (localTrack.FileTrackInfo.Authors?.Count is null or 0)
-            {
-                var name = Path.GetFileName(authorFolder);
+            // The author folder is *added* to the list rather than only filling an empty one.
+            // Audiobooks routinely tag the narrator as the artist - this library's Harry Potter set
+            // reads "Jim Dale" - and distance scoring takes the best matching variant, so offering
+            // the folder alongside the tag can only help. Filling only when empty left those files
+            // scoring 60% against an 80% threshold and rejected despite matching the right book.
+            var authorName = Path.GetFileName(authorFolder);
 
-                if (name.IsNotNullOrWhiteSpace())
+            if (authorName.IsNotNullOrWhiteSpace())
+            {
+                localTrack.FileTrackInfo.Authors ??= new List<string>();
+
+                if (!localTrack.FileTrackInfo.Authors.Contains(authorName, StringComparer.InvariantCultureIgnoreCase))
                 {
-                    localTrack.FileTrackInfo.Authors = new System.Collections.Generic.List<string> { name };
+                    localTrack.FileTrackInfo.Authors.Add(authorName);
                 }
             }
 

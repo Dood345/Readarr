@@ -54,13 +54,24 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Aggregation.Aggregators
         }
 
         [Test]
-        public void should_not_overwrite_tags_that_are_already_populated()
+        public void should_not_overwrite_a_populated_book_title()
         {
             var track = Subject.Aggregate(
                 File(@"C:\books\J.R.R. Tolkien\The Hobbit\x.mp3", "Real Tagged Title", "Real Tagged Author"), false);
 
             track.FileTrackInfo.BookTitle.Should().Be("Real Tagged Title");
-            track.FileTrackInfo.Authors.Should().BeEquivalentTo("Real Tagged Author");
+        }
+
+        [Test]
+        public void should_offer_the_folder_author_alongside_a_tagged_one()
+        {
+            // Audiobooks routinely tag the narrator as the artist. Distance scoring picks the best
+            // matching variant, so the folder is added rather than deferring to the tag - filling
+            // only when empty left these files scoring 60% against an 80% threshold.
+            var track = Subject.Aggregate(
+                File(@"C:\books\J.K. Rowling\Harry Potter 1 - The Philosopher's Stone\x.mp3", null, "Jim Dale"), false);
+
+            track.FileTrackInfo.Authors.Should().BeEquivalentTo("Jim Dale", "J.K. Rowling");
         }
 
         [Test]
