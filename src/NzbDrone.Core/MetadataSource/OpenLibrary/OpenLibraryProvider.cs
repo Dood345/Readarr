@@ -73,24 +73,103 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         }
 
         /// <summary>
-        /// Open Library frequently holds several work records for the same book. Brian Herbert has
-        /// two works both titled "Dune" - OL8383298W with 3 editions and OL19618275W with 10 - and
-        /// both would otherwise appear in the library as separate books.
+        /// Open Library holds several work records for the same book, and separate records for
+        /// collections, so an author's bibliography arrives with noise in it. Two shapes are dealt
+        /// with here, in this order:
         ///
-        /// Works with the same normalised title under one author are collapsed, keeping the record
-        /// with the most editions and then the most ratings, which is the one more likely to be
-        /// matched by an indexer and to carry usable covers and dates.
+        /// 1. Omnibus works, whose title is a list of other books by the same author -
+        ///    "Dune, Dune Messiah, Children of Dune".
+        /// 2. Duplicate works under differing titles, where one title wholly contains the other -
+        ///    "Dune: The Butlerian Jihad" and "The Butlerian Jihad".
+        ///
+        /// The order is load bearing. Run the other way round, the omnibus swallows the real books
+        /// it names, because it contains each of their titles.
         /// </summary>
         private static List<OpenLibrarySearchDoc> DeduplicateWorks(IEnumerable<OpenLibrarySearchDoc> docs)
         {
-            return docs
+            var all = docs
                 .Where(x => x.Key.IsNotNullOrWhiteSpace())
-                .GroupBy(x => NormalizeTitle(x.Title))
-                .Select(g => g
-                    .OrderByDescending(x => x.EditionKeys?.Count ?? 0)
-                    .ThenByDescending(x => x.RatingsCount ?? 0)
-                    .First())
+                .Select(x => new WorkTitle(x, NormalizeTitle(x.Title, stripSubtitle: false)))
+                .Where(x => x.Normalized.IsNotNullOrWhiteSpace())
                 .ToList();
+
+            // Only multi-word titles are safe to look for inside another title. "Dune" occurs inside
+            // "Dune Messiah", which is a different book.
+            var phrases = all.Select(x => x.Normalized)
+                .Where(x => WordCount(x) >= 2)
+                .Distinct()
+                .ToList();
+
+            var singles = all
+                .Where(x => phrases.Count(p => p != x.Normalized && ContainsPhrase(x.Normalized, p)) < 2)
+                .ToList();
+
+            var kept = new List<WorkTitle>();
+
+            // Shortest title first, so the plain "The Butlerian Jihad" becomes the record a longer
+            // variant is recognised against rather than the other way round.
+            foreach (var candidate in singles.OrderBy(x => WordCount(x.Normalized)).ThenBy(x => x.Normalized.Length))
+            {
+                // An identical title always collapses. Finding one title *inside* another needs at
+                // least two words to be safe: "Dune" occurs in "Dune Messiah", a different book.
+                var existing = kept.FirstOrDefault(x =>
+                    x.Normalized == candidate.Normalized ||
+                    (WordCount(x.Normalized) >= 2 && ContainsPhrase(candidate.Normalized, x.Normalized)));
+
+                if (existing == null)
+                {
+                    kept.Add(candidate);
+                    continue;
+                }
+
+                // Same book twice: keep whichever record is richer, since that is the one more
+                // likely to be matched by an indexer and to carry usable covers and dates.
+                if (Richness(candidate.Doc) > Richness(existing.Doc))
+                {
+                    kept[kept.IndexOf(existing)] = new WorkTitle(candidate.Doc, existing.Normalized);
+                }
+            }
+
+            return kept.Select(x => x.Doc).ToList();
+        }
+
+        private static long Richness(OpenLibrarySearchDoc doc)
+        {
+            return ((doc.EditionKeys?.Count ?? 0) * 1000L) + (doc.RatingsCount ?? 0);
+        }
+
+        private static int WordCount(string value)
+        {
+            return value.IsNullOrWhiteSpace() ? 0 : value.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        }
+
+        /// <summary>
+        /// Whole-phrase containment on the normalised (lowercase, punctuation-free) titles, so
+        /// "children of dune" matches inside "dune dune messiah children of dune" but "une" does not.
+        /// </summary>
+        private static bool ContainsPhrase(string haystack, string needle)
+        {
+            if (haystack.IsNullOrWhiteSpace() || needle.IsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            return haystack == needle
+                   || haystack.StartsWith(needle + " ", StringComparison.Ordinal)
+                   || haystack.EndsWith(" " + needle, StringComparison.Ordinal)
+                   || haystack.Contains(" " + needle + " ", StringComparison.Ordinal);
+        }
+
+        private sealed class WorkTitle
+        {
+            public WorkTitle(OpenLibrarySearchDoc doc, string normalized)
+            {
+                Doc = doc;
+                Normalized = normalized;
+            }
+
+            public OpenLibrarySearchDoc Doc { get; }
+            public string Normalized { get; }
         }
 
         /// <summary>
@@ -762,13 +841,23 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         /// </summary>
         private static string NormalizeTitle(string title)
         {
+            return NormalizeTitle(title, stripSubtitle: true);
+        }
+
+        /// <summary>
+        /// Dropping the subtitle is right when matching against Audible, where "Dune: Book One" and
+        /// "Dune" are the same product. It is wrong for deduplication: "Dune: The Butlerian Jihad"
+        /// would reduce to "dune" and never be recognised as the same book as "The Butlerian Jihad".
+        /// </summary>
+        private static string NormalizeTitle(string title, bool stripSubtitle)
+        {
             if (title.IsNullOrWhiteSpace())
             {
                 return string.Empty;
             }
 
             var colon = title.IndexOf(':');
-            var trimmed = colon > 0 ? title.Substring(0, colon) : title;
+            var trimmed = stripSubtitle && colon > 0 ? title.Substring(0, colon) : title;
 
             var builder = new StringBuilder(trimmed.Length);
             var lastWasSpace = false;
