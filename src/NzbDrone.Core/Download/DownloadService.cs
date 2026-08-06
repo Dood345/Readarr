@@ -78,10 +78,17 @@ namespace NzbDrone.Core.Download
             // Get the seed configuration for this release.
             remoteBook.SeedConfiguration = _seedConfigProvider.GetSeedConfiguration(remoteBook);
 
-            // Limit grabs to 2 per second.
-            if (remoteBook.Release.DownloadUrl.IsNotNullOrWhiteSpace() && !remoteBook.Release.DownloadUrl.StartsWith("magnet:"))
+            // Limit grabs to 2 per second, per indexer host. Only http(s) releases have a host to
+            // rate limit against: magnet links and protocol-specific locators such as the
+            // slskd://<base64> one carry no host, and parsing them as a URI throws. Testing the
+            // scheme rather than excluding known prefixes means a new protocol needs no change here.
+            var downloadUrl = remoteBook.Release.DownloadUrl;
+
+            if (downloadUrl.IsNotNullOrWhiteSpace() &&
+                (downloadUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 downloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
             {
-                var url = new HttpUri(remoteBook.Release.DownloadUrl);
+                var url = new HttpUri(downloadUrl);
                 await _rateLimitService.WaitAndPulseAsync(url.Host, TimeSpan.FromSeconds(2));
             }
 

@@ -32,7 +32,7 @@ namespace NzbDrone.Core.Download.Clients.Slskd
         [FieldDefinition(1, Label = "API Key", Privacy = PrivacyLevel.ApiKey, HelpText = "Needs a key with the readwrite or administrator role, a readonly key cannot enqueue downloads")]
         public string ApiKey { get; set; }
 
-        [FieldDefinition(2, Label = "Download Path", HelpText = "slskd's completed download directory as Lidarr sees it. Both containers must map the same host folder")]
+        [FieldDefinition(2, Label = "Download Path", HelpText = "slskd's completed download directory as Readarr sees it. This is slskd's own downloads path, which is often a subfolder such as /downloads/music - check directories.downloads in slskd.yml")]
         public string DownloadPath { get; set; }
 
         public NzbDroneValidationResult Validate()

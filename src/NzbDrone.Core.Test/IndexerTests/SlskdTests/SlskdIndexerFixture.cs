@@ -1,8 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.Books;
+using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Indexers.Slskd;
+using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
@@ -31,6 +37,43 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         private List<Parser.Model.ReleaseInfo> Build(params SlskdSearchResponse[] responses)
         {
             return SlskdIndexer.BuildReleases(responses, "Pink Floyd", _settings);
+        }
+
+        [Test]
+        public async Task fetch_should_stamp_the_indexer_onto_every_release()
+        {
+            // Regression: Search returned BuildReleases directly, skipping CleanupReleases, so every
+            // release carried IndexerId 0. Grabbing then failed with no usable error because
+            // DownloadService could not resolve which indexer the release came from.
+            var subject = Mocker.Resolve<SlskdIndexer>();
+            subject.Definition = new IndexerDefinition
+            {
+                Id = 7,
+                Name = "slskd",
+                Settings = _settings,
+                Priority = 3
+            };
+
+            Mocker.GetMock<ISlskdProxy>()
+                .Setup(x => x.Search(It.IsAny<string>(), It.IsAny<SlskdIndexerSettings>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<SlskdSearchResponse>
+                {
+                    Peer("bob", @"music\Pink Floyd\Wish You Were Here\01.mp3", @"music\Pink Floyd\Wish You Were Here\02.mp3")
+                });
+
+            var criteria = new BookSearchCriteria
+            {
+                Author = new Author { Metadata = new AuthorMetadata { Name = "Pink Floyd" } },
+                Books = new List<Book>(),
+                BookTitle = "Wish You Were Here"
+            };
+
+            var releases = await subject.Fetch(criteria);
+
+            releases.Should().NotBeEmpty();
+            releases.Should().OnlyContain(x => x.IndexerId == 7);
+            releases.Should().OnlyContain(x => x.Indexer == "slskd");
+            releases.Should().OnlyContain(x => x.DownloadProtocol == nameof(SoulseekDownloadProtocol));
         }
 
         [Test]

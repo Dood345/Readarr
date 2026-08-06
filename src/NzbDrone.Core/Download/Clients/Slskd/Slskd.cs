@@ -98,9 +98,9 @@ namespace NzbDrone.Core.Download.Clients.Slskd
                 DownloadId = BuildDownloadId(user.Username, directory.Directory),
                 Title = GetLeafName(directory.Directory),
 
-                // Non-empty so CompletedDownloadService will still consider imports that Lidarr
+                // Non-empty so CompletedDownloadService will still consider imports that Readarr
                 // did not grab itself, matching what the blackhole clients do.
-                Category = "Lidarr",
+                Category = "Readarr",
                 TotalSize = totalSize,
                 RemainingSize = Math.Max(0, totalSize - transferred),
                 Status = MapStatus(files),
@@ -125,7 +125,7 @@ namespace NzbDrone.Core.Download.Clients.Slskd
                 return DownloadItemStatus.Warning;
             }
 
-            // Only complete once every file in the folder is, otherwise Lidarr would try to import
+            // Only complete once every file in the folder is, otherwise Readarr would try to import
             // a partially transferred album.
             if (states.All(s => s.ContainsIgnoreCase("Succeeded")))
             {

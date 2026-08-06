@@ -68,7 +68,7 @@ namespace NzbDrone.Core.Indexers.Slskd
             finally
             {
                 // slskd keeps completed searches around for its own retention window; drop ours so
-                // repeated Lidarr searches don't pile up in the peer's search history view.
+                // repeated Readarr searches don't pile up in the peer's search history view.
                 try
                 {
                     var deleteRequest = BuildRequest($"searches/{searchId}", settings).Build();

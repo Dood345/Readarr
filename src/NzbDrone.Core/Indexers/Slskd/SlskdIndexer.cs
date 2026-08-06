@@ -68,7 +68,12 @@ namespace NzbDrone.Core.Indexers.Slskd
 
             var responses = await _proxy.Search(query, Settings, CancellationToken.None);
 
-            return BuildReleases(responses, artistName, Settings);
+            // CleanupReleases stamps IndexerId, Indexer, DownloadProtocol and IndexerPriority.
+            // HTTP indexers get this from their fetch pipeline; this one builds releases itself, so
+            // it has to call it explicitly. Without it every release carries IndexerId 0 and the
+            // grab fails with no usable error, because DownloadService cannot resolve the indexer
+            // the release came from.
+            return CleanupReleases(BuildReleases(responses, artistName, Settings));
         }
 
         public static List<ReleaseInfo> BuildReleases(IEnumerable<SlskdSearchResponse> responses, string artistName, SlskdIndexerSettings settings)
