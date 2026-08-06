@@ -181,31 +181,29 @@ search for "Children of Dune" returned 139 releases including M4B audiobooks.
 also returns music that merely matches the title — the Brian Tyler *Children of Dune* soundtrack
 came back as FLAC albums. Worth a book-oriented filter, or dropping `flac` from the default.
 
-### 4. Audiobook vs ebook as a first-class distinction — partly done
+### 4. ~~Audiobook vs ebook as a first-class distinction~~ — DONE
 
-`Edition` already had `IsEbook` and `Format`, and the Open Library/Audible provider now populates
-both: text editions from Open Library carry `IsEbook = true`, Audible editions carry
-`IsEbook = false` and `Format = "Audiobook"` with the narrators in `Disambiguation`. A book with both
-an epub and an m4b - exactly the user's folder layout - now models as one `Book` with two `Edition`
-rows that can be told apart.
+A book now monitors **one edition per media type**, so a title existing as both an epub and an m4b
+tracks both instead of forcing a choice.
 
-What is still missing is option **b** below: letting quality profiles and monitoring *target* a
-media type, so "monitor audiobooks only for this author" becomes expressible. The data is there now;
-the profile/monitoring surface is not.
+Media type is derived rather than stored: `Edition.IsEbook` already existed and Quality ids already
+separate text (0-4) from audio (10-13), so `BookMediaType` is a computed view over both.
 
-Original options, for reference:
+Key points for anyone touching this:
 
-Options, roughly increasing in cost:
+- **`PrimaryEdition()` vs `MonitoredEditions()`.** Most former `Single(x => x.Monitored)` callers
+  only wanted a representative edition for display; they use `PrimaryEdition()`. Anything that acts
+  on what is tracked must use `MonitoredEditions()` or `MonitoredEditionFor(mediaType)`.
+- **`SetMonitored` scopes to media type** — it unmonitors only editions of the same type.
+- **Search runs once per distinct monitored edition title**, because audiobook editions are often
+  titled "... (Unabridged)". Identical titles collapse to one query.
+- **Migration 042** opts existing books in, but only where the book is already tracked.
 
-- **a.** Derive it from file extension at import and expose it on `BookFile` / `Edition`, then filter
-  in the UI. Cheapest, no schema change beyond a column.
-- **b.** Add a media-type concept to `Edition` and let quality profiles and monitoring target it, so
-  "monitor audiobooks only for this author" becomes expressible. This is what actually makes the
-  library manageable and is probably the right answer.
-- **c.** Separate root folders per media type. Matches how the user already separates `podcast/`, but
-  fights the fact that their book folders deliberately hold both formats together.
+A quality profile can allow both text and audio qualities, so no per-media-type profile on Author
+was needed — the single monitored edition was the only real blocker.
 
-Recommend **b**, with **a** as the migration path to populate it.
+Not done: the UI has no per-format filter or column, and there is still one `qualityProfileId` per
+author, so both formats share cutoff and quality rules.
 
 ### 5. Organisation / naming
 
