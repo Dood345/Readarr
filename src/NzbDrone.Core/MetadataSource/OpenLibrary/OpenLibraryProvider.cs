@@ -55,8 +55,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             var audibleProducts = _audible.SearchByAuthor(metadata.Name, MaxAudibleResults);
             var audibleByTitle = IndexByTitle(audibleProducts);
 
-            var books = docs
-                .Where(x => x.Key.IsNotNullOrWhiteSpace())
+            var books = DeduplicateWorks(docs)
                 .Select(x => MapBook(x, audibleByTitle))
                 .ToList();
 
@@ -71,6 +70,27 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 Books = books,
                 Series = series
             };
+        }
+
+        /// <summary>
+        /// Open Library frequently holds several work records for the same book. Brian Herbert has
+        /// two works both titled "Dune" - OL8383298W with 3 editions and OL19618275W with 10 - and
+        /// both would otherwise appear in the library as separate books.
+        ///
+        /// Works with the same normalised title under one author are collapsed, keeping the record
+        /// with the most editions and then the most ratings, which is the one more likely to be
+        /// matched by an indexer and to carry usable covers and dates.
+        /// </summary>
+        private static List<OpenLibrarySearchDoc> DeduplicateWorks(IEnumerable<OpenLibrarySearchDoc> docs)
+        {
+            return docs
+                .Where(x => x.Key.IsNotNullOrWhiteSpace())
+                .GroupBy(x => NormalizeTitle(x.Title))
+                .Select(g => g
+                    .OrderByDescending(x => x.EditionKeys?.Count ?? 0)
+                    .ThenByDescending(x => x.RatingsCount ?? 0)
+                    .First())
+                .ToList();
         }
 
         /// <summary>
