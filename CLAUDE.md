@@ -46,8 +46,9 @@ Practical consequences:
 share most infrastructure verbatim, so fixes usually port with only entity renames
 (Artist→Author, Album→Book, Track→Edition/BookFile). Two differences are load-bearing and are
 called out in the sections below: Readarr uses the older `System.Data.SQLite.Core.Servarr` provider
-that needs a *system* libsqlite3, and Readarr still has the `DownloadProtocol` **enum** where Lidarr
-has a pluggable marker interface. Both forks are now on .NET 8.
+that needs a *system* libsqlite3, and Readarr models a book as Author → Book → **Edition** →
+BookFile where Lidarr has Artist → Album → Track. Both forks are now on .NET 8, and both now use
+the `IDownloadProtocol` marker interface rather than an enum.
 
 ## Commands
 
@@ -158,8 +159,8 @@ and behave exactly as in Lidarr:
 - **Data**: Dapper over SQLite (default) **or** Postgres — both must keep working.
   `BasicRepository<TModel>`, `TableMapping.cs`, `WhereBuilderSqlite`/`WhereBuilderPostgres`.
   Migrations are FluentMigrator in `src/NzbDrone.Core/Datastore/Migration/`, `NNN_snake_case.cs`
-  with `[Migration(NNN)]`. Currently 41 migrations, highest **040**. Always add the next number;
-  never edit an existing migration.
+  with `[Migration(NNN)]`. Highest is **042**, so the next number is **043**. Always add the next
+  number; never edit an existing migration.
 - **Providers (ThingiProvider)**: indexers, download clients, notifications, import lists and
   metadata consumers are all `IProvider` + `IProviderConfig` + `ProviderDefinition`, discovered by
   reflection. Adding an indexer means adding a folder — no registration or UI changes.
@@ -171,10 +172,27 @@ and behave exactly as in Lidarr:
 `src/NzbDrone.Core/Books/Model/`. Deeper than Sonarr's, and it has a second axis Lidarr lacks:
 
 **Author** (with a shared `AuthorMetadata` row) → **Book** → **Edition** (a specific published
-edition; one is monitored) → **BookFile**. Separately, **Series** ↔ **Book** is many-to-many through
-`SeriesBookLink`.
+edition) → **BookFile**. Separately, **Series** ↔ **Book** is many-to-many through `SeriesBookLink`.
 
 Refresh logic is in `Books/Services/Refresh*Service.cs` over a shared `RefreshEntityServiceBase`.
+
+### Media type: a book can be an ebook *and* an audiobook
+
+This fork exists largely for the case where one book folder holds both an epub and an m4b, so a
+book monitors **one edition per media type**, not one edition outright. Upstream assumed exactly one.
+
+- `BookMediaType { Ebook, Audiobook }` in `Books/Model/BookMediaType.cs` is **derived, not stored** —
+  from `Edition.IsEbook` for editions and from the quality id for files (ids below 10 are text,
+  10 and above audio).
+- **`PrimaryEdition()` vs `MonitoredEditions()`.** Callers that only want a representative edition
+  for display use `PrimaryEdition()`. Anything acting on what is *tracked* must use
+  `MonitoredEditions()` or `MonitoredEditionFor(mediaType)`. Replacing either with
+  `Single(x => x.Monitored)` reintroduces the single-format assumption.
+- Migration 042 opted existing books in. `DistanceCalculator` scores `wrong_format` at 5.0 so a text
+  file will not match an audio edition. Search runs once per distinct monitored edition title,
+  because audiobooks are often titled "… (Unabridged)".
+- **The file-handling half is unfinished** — see "Constraints on planned work" and
+  `PLAN-MULTI-FORMAT.md`.
 
 ### Metadata providers
 
@@ -250,15 +268,17 @@ with entity renames.
 
 ## Constraints on planned work
 
-- **slskd / Soulseek support is expensive here.** `src/NzbDrone.Core/Indexers/DownloadProtocol.cs`
-  is still a plain `enum { Unknown, Usenet, Torrent }`. Lidarr replaced this with an
-  `IDownloadProtocol` marker interface plus string identity specifically so new protocols could be
-  added, which made a Soulseek client tractable there. In Readarr, adding a third protocol means
-  touching every site that switches on the enum. **Port Lidarr's marker-interface refactor first**;
-  don't bolt a third enum value on.
+- **Cross-format file handling is not finished, and one part of it loses data.**
+  `UpgradeMediaFileService.UpgradeBookFile` recycles every file on the *book*, so importing an
+  audiobook deletes the ebook; `UpgradeSpecification`, `UpgradeDiskSpecification` and
+  `CutoffSpecification` all compare a release against every file on the book regardless of media
+  type, so an ebook is rejected whenever an audiobook exists. See `PLAN-MULTI-FORMAT.md`; stages 0
+  and 1 there are the fix. Anything touching those paths should scope by media type.
 - **Audiobookshelf as the frontend** means Readarr's own UI matters less than its API. Favour
   keeping `Readarr.Api.V1` stable and well-formed over UI polish.
 - ~~.NET 6 is EOL.~~ Done — the fork is on .NET 8, matching Lidarr.
+- ~~slskd needs the protocol enum replaced first.~~ Done — `IDownloadProtocol` marker interface,
+  plus the slskd indexer and download client.
 
 ## Conventions
 
