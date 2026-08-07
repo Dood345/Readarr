@@ -93,6 +93,32 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         }
 
         [Test]
+        public void should_not_let_a_short_series_title_swallow_the_series()
+        {
+            // Open Library carries a work called simply "Harry Potter". Every "Harry Potter and
+            // the ..." contains it, and a naive containment check collapsed seven books into one.
+            var titles = TitlesFor(
+                Work("W0", "Harry Potter", editions: 40),
+                Work("W1", "Harry Potter and the Philosopher's Stone", editions: 30),
+                Work("W2", "Harry Potter and the Chamber of Secrets", editions: 25),
+                Work("W3", "Harry Potter and the Goblet of Fire", editions: 20));
+
+            titles.Should().HaveCount(4);
+            titles.Should().Contain("Harry Potter and the Goblet of Fire");
+        }
+
+        [Test]
+        public void should_still_collapse_a_subtitled_variant_of_the_same_book()
+        {
+            // The shorter title accounts for most of the longer one here, unlike the series case.
+            var titles = TitlesFor(
+                Work("W1", "The Butlerian Jihad", editions: 3),
+                Work("W2", "Dune: The Butlerian Jihad", editions: 12));
+
+            titles.Should().HaveCount(1);
+        }
+
+        [Test]
         public void should_collapse_exact_duplicates()
         {
             var titles = TitlesFor(

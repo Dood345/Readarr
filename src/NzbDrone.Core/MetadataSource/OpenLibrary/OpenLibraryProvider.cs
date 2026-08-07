@@ -26,6 +26,10 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         private const int MaxSearchResults = 25;
         private const int MaxAudibleResults = 50;
 
+        // How much of the longer title the shorter one must account for before the two are treated
+        // as the same book recorded twice.
+        private const double ContainmentWordRatio = 0.6;
+
         private readonly IOpenLibraryProxy _openLibrary;
         private readonly IAudibleProxy _audible;
         private readonly Logger _logger;
@@ -111,11 +115,11 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             // variant is recognised against rather than the other way round.
             foreach (var candidate in singles.OrderBy(x => WordCount(x.Normalized)).ThenBy(x => x.Normalized.Length))
             {
-                // An identical title always collapses. Finding one title *inside* another needs at
-                // least two words to be safe: "Dune" occurs in "Dune Messiah", a different book.
+                // An identical title always collapses. Finding one title *inside* another is only
+                // the same book when the two are close in length.
                 var existing = kept.FirstOrDefault(x =>
                     x.Normalized == candidate.Normalized ||
-                    (WordCount(x.Normalized) >= 2 && ContainsPhrase(candidate.Normalized, x.Normalized)));
+                    IsSameBookByContainment(candidate.Normalized, x.Normalized));
 
                 if (existing == null)
                 {
@@ -145,6 +149,29 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             return doc.Language == null
                    || doc.Language.Count == 0
                    || doc.Language.Contains("eng");
+        }
+
+        /// <summary>
+        /// "Dune: The Butlerian Jihad" and "The Butlerian Jihad" are one book; "Harry Potter and
+        /// the Goblet of Fire" and "Harry Potter" are not. Both are containments, so length alone
+        /// decides: the shorter title has to account for most of the longer one.
+        /// </summary>
+        /// <remarks>
+        /// Without this, a short generic work title swallows an entire series. Open Library carries
+        /// a work called simply "Harry Potter", and every "Harry Potter and the ..." collapsed into
+        /// it, leaving one book where there were seven.
+        /// </remarks>
+        private static bool IsSameBookByContainment(string longer, string shorter)
+        {
+            var shortWords = WordCount(shorter);
+            var longWords = WordCount(longer);
+
+            if (shortWords < 2 || longWords == 0)
+            {
+                return false;
+            }
+
+            return shortWords >= longWords * ContainmentWordRatio && ContainsPhrase(longer, shorter);
         }
 
         private static long Richness(OpenLibrarySearchDoc doc)
