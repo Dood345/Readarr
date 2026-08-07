@@ -14,6 +14,13 @@ namespace NzbDrone.Core.Parser.Model
         public List<string> Authors { get; set; }
         public string AuthorTitle => Authors.FirstOrDefault();
         public string BookTitle { get; set; }
+
+        /// <summary>
+        /// The book title implied by the folder the file sits in. Kept separate from BookTitle so a
+        /// real tag is never overwritten, while identification can still score against both: an
+        /// audiobook's album tag is frequently the *series* ("Dune Chronicles") rather than the book.
+        /// </summary>
+        public string PathBookTitle { get; set; }
         public string SeriesTitle { get; set; }
         public string SeriesIndex { get; set; }
         public string Isbn { get; set; }

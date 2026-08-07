@@ -43,14 +43,21 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators
             var bookFolder = Path.GetDirectoryName(localTrack.Path);
             var authorFolder = bookFolder.IsNotNullOrWhiteSpace() ? Path.GetDirectoryName(bookFolder) : null;
 
-            if (localTrack.FileTrackInfo.BookTitle.IsNullOrWhiteSpace())
-            {
-                var name = Path.GetFileName(bookFolder);
+            var folderName = Path.GetFileName(bookFolder);
 
-                if (name.IsNotNullOrWhiteSpace())
+            if (folderName.IsNotNullOrWhiteSpace())
+            {
+                var match = SeriesPrefixRegex.Match(folderName);
+                var folderTitle = match.Success ? match.Groups["title"].Value.Trim() : folderName;
+
+                // Recorded even when a tag exists. An audiobook's album tag is often the series
+                // rather than the book - every file of this library's Dune rip is tagged
+                // "Dune Chronicles" - which makes every book in the series look like the same one.
+                localTrack.FileTrackInfo.PathBookTitle = folderTitle;
+
+                if (localTrack.FileTrackInfo.BookTitle.IsNullOrWhiteSpace())
                 {
-                    var match = SeriesPrefixRegex.Match(name);
-                    localTrack.FileTrackInfo.BookTitle = match.Success ? match.Groups["title"].Value.Trim() : name;
+                    localTrack.FileTrackInfo.BookTitle = folderTitle;
                 }
             }
 

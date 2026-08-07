@@ -41,6 +41,14 @@ namespace NzbDrone.Core.Profiles.Metadata
         // removed by the provider instead, where edition counts make that judgement reliably.
         public const double DEFAULT_MIN_POPULARITY = 0;
 
+        // Open Library records merchandise and study aids as works alongside the books themselves:
+        // "Dune Coloring Book", "Dune Calendar 1978", "DUNE : the Graphic Novel", box sets and
+        // SparkNotes guides. They are not just clutter - they win identification matches against
+        // real files, so "Dune 1 - Dune" resolved to the graphic novel. Users can edit this list.
+        public const string DEFAULT_IGNORED_TERMS =
+            "graphic novel,coloring book,colouring book,calendar,sparknotes,study guide," +
+            "boxed set,box set,complete series,omnibus,movie tie-in";
+
         private static readonly Regex PartOrSetRegex = new Regex(@"(?<from>\d+) of (?<to>\d+)|(?<from>\d+)\s?/\s?(?<to>\d+)|(?<from>\d+)\s?-\s?(?<to>\d+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -295,6 +303,7 @@ namespace NzbDrone.Core.Profiles.Metadata
                     MinPopularity = DEFAULT_MIN_POPULARITY,
                     SkipMissingDate = true,
                     SkipPartsAndSets = true,
+                    Ignored = DEFAULT_IGNORED_TERMS.Split(',').ToList(),
                     AllowedLanguages = "eng, null"
                 });
             }

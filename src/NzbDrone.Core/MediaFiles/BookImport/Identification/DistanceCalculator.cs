@@ -69,7 +69,15 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 }
             }
 
-            var fileTitles = new[] { title, CleanTitleCruft.Replace(title) }.Distinct().ToList();
+            // The folder name is offered alongside the album tag and the best variant wins, the same
+            // way author variants are handled. Without it a series-tagged album makes every book in
+            // that series score identically.
+            var pathTitle = localTracks.MostCommon(x => x.FileTrackInfo.PathBookTitle) ?? "";
+
+            var fileTitles = new[] { title, CleanTitleCruft.Replace(title), pathTitle, CleanTitleCruft.Replace(pathTitle) }
+                .Where(x => x.IsNotNullOrWhiteSpace())
+                .Distinct()
+                .ToList();
 
             dist.AddString("book", fileTitles, titleOptions);
             Logger.Trace("book: '{0}' vs '{1}'; {2}", fileTitles.ConcatToString("' or '"), titleOptions.ConcatToString("' or '"), dist.NormalizedDistance());

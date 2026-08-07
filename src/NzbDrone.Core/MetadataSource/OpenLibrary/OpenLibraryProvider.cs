@@ -89,6 +89,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         {
             var all = docs
                 .Where(x => x.Key.IsNotNullOrWhiteSpace())
+                .Where(HasEnglishEdition)
                 .Select(x => new WorkTitle(x, NormalizeTitle(x.Title, stripSubtitle: false)))
                 .Where(x => x.Normalized.IsNotNullOrWhiteSpace())
                 .ToList();
@@ -131,6 +132,19 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             }
 
             return kept.Select(x => x.Doc).ToList();
+        }
+
+        /// <summary>
+        /// Open Library lists translations as works in their own right, so an author's bibliography
+        /// arrives with the German, Spanish, Polish and Portuguese editions of books already in it -
+        /// 16 of Trudi Canavan's 131 works. A work is kept when it says nothing about language,
+        /// since unknown is not the same as "not English".
+        /// </summary>
+        private static bool HasEnglishEdition(OpenLibrarySearchDoc doc)
+        {
+            return doc.Language == null
+                   || doc.Language.Count == 0
+                   || doc.Language.Contains("eng");
         }
 
         private static long Richness(OpenLibrarySearchDoc doc)
