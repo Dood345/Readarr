@@ -1,0 +1,339 @@
+{
+  "_comment": [
+    "Curated bibliographies for every author in the fork owner's library (S:\\My Books).",
+    "",
+    "Compiled from web sources - publisher pages, author sites, Wikipedia, ISFDB - and NOT from",
+    "Open Library. That is deliberate: Open Library is the source under test, so deriving ground",
+    "truth from it would make BibliographyAccuracyFixture circular and unable to detect its errors.",
+    "Open Library was consulted only afterwards, to cross-check for omissions, and the disagreements",
+    "it produced are recorded in 'openLibraryNotes'.",
+    "",
+    "Scope follows the precedent the owner set with Frank Herbert: an author's own primary books.",
+    "Included:  novels, and for non-fiction authors their principal authored books; co-authored works",
+    "           (they appear under every credited author).",
+    "Excluded:  omnibuses and box sets, anthologies the author contributed a story to, volumes they",
+    "           only edited, translations, graphic-novel adaptations of their own work, and posthumous",
+    "           assemblies from unpublished manuscripts.",
+    "",
+    "'confidence' is honest about how much this list should be trusted:",
+    "  high   - well-documented author, bibliography corroborated by multiple independent sources.",
+    "  medium - corroborated, but the author is obscure or prolific enough that omissions are likely.",
+    "  low    - thin sourcing. Verify before relying on it.",
+    "",
+    "Only the three authors in expected_bibliographies.json are wired into the accuracy fixture.",
+    "Promoting one from here needs its Open Library payload fetched (see refresh-corpus.sh) and its",
+    "author key confirmed - see the warnings below, several keys are wrong or conflated."
+  ],
+
+  "authors": [
+    {
+      "name": "Annalee Newitz",
+      "foreignAuthorId": "OL2699570A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Pretend We're Dead: Capitalist Monsters in American Pop Culture", "year": 2006 },
+        { "title": "Scatter, Adapt, and Remember", "year": 2013 },
+        { "title": "Autonomous", "year": 2017 },
+        { "title": "The Future of Another Timeline", "year": 2019 },
+        { "title": "Four Lost Cities: A Secret History of the Urban Age", "year": 2021 },
+        { "title": "The Terraformers", "year": 2023 },
+        { "title": "Stories Are Weapons: Psychological Warfare and the American Mind", "year": 2024 },
+        { "title": "Automatic Noodle", "year": 2025 }
+      ],
+      "openLibraryNotes": "Key is correct. 'She's Such a Geek' is an anthology Newitz co-edited, excluded by scope."
+    },
+    {
+      "name": "Apostolos Doxiadis",
+      "foreignAuthorId": "OL87267A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "Parallel Life", "year": 1985, "note": "Greek only" },
+        { "title": "Makavettas", "year": 1988, "note": "Greek only" },
+        { "title": "Uncle Petros and Goldbach's Conjecture", "year": 1992, "note": "English translation 2000" },
+        { "title": "Three Little Men", "year": 1997, "note": "Greek only" },
+        { "title": "Logicomix: An Epic Search for Truth", "year": 2009, "note": "with Christos H. Papadimitriou" }
+      ],
+      "openLibraryNotes": "WRONG KEY BY DEFAULT. Author search for 'Apostolos Doxiadis' returns OL10836046A, a different person with 3 works ('Greek Commander'). The real author is OL87267A, filed as 'Apostolos K. Doxiadēs'. Readarr's author search would add the wrong one."
+    },
+    {
+      "name": "Brené Brown",
+      "foreignAuthorId": "OL3121637A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "Women and Shame", "year": 2004 },
+        { "title": "I Thought It Was Just Me (But It Isn't)", "year": 2007 },
+        { "title": "The Gifts of Imperfection", "year": 2010 },
+        { "title": "Daring Greatly", "year": 2012 },
+        { "title": "Rising Strong", "year": 2015 },
+        { "title": "Braving the Wilderness", "year": 2017 },
+        { "title": "Dare to Lead", "year": 2018 },
+        { "title": "Atlas of the Heart", "year": 2021 }
+      ],
+      "openLibraryNotes": "Key is correct. Sources count 17 'books' including workbooks, curricula and audio-only titles; only the principal authored books are listed. 'The Art of Asking' and 'You Are Your Best Thing' are not hers alone - the latter she co-edited with Tarana Burke."
+    },
+    {
+      "name": "Charles H. Kahn",
+      "foreignAuthorId": "OL455933A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Anaximander and the Origins of Greek Cosmology", "year": 1960 },
+        { "title": "The Verb \"Be\" in Ancient Greek", "year": 1973 },
+        { "title": "The Art and Thought of Heraclitus", "year": 1979 },
+        { "title": "Plato and the Socratic Dialogue", "year": 1996 },
+        { "title": "Pythagoras and the Pythagoreans: A Brief History", "year": 2001 },
+        { "title": "Essays on Being", "year": 2009 },
+        { "title": "Plato and the Post-Socratic Dialogue", "year": 2013 }
+      ],
+      "openLibraryNotes": "CONFLATED KEY. OL455933A mixes this Charles H. Kahn (1928-2023, classicist at Penn) with an unrelated author of 'Personal deductions in the federal income tax', 'Employee compensation under the income tax' and 'Going places with your personality'. Four of the fourteen English works under that key are not his."
+    },
+    {
+      "name": "Clark R. Mollenhoff",
+      "foreignAuthorId": "OL764316A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "Washington Cover-Up", "year": 1962 },
+        { "title": "Tentacles of Power: The Story of Jimmy Hoffa", "year": 1965 },
+        { "title": "Despoilers of Democracy", "year": 1965 },
+        { "title": "The Pentagon: Politics, Profits and Plunder", "year": 1967 },
+        { "title": "George Romney: Mormon in Politics", "year": 1968 },
+        { "title": "Strike Force: Organized Crime and the Government", "year": 1972 },
+        { "title": "Game Plan for Disaster", "year": 1976 },
+        { "title": "The Man Who Pardoned Nixon", "year": 1976 },
+        { "title": "The President Who Failed: Carter Out of Control", "year": 1980 },
+        { "title": "Investigative Reporting", "year": 1981 },
+        { "title": "Atanasoff: Forgotten Father of the Computer", "year": 1988 },
+        { "title": "Ballad to an Iowa Farmer and Other Reflections", "year": 1991 }
+      ],
+      "openLibraryNotes": "Key is correct. Sources describe him as 'author of eleven previous books' at the time of Atanasoff, which matches this list. 'Life Line of Democracy' (1964) appears in Open Library and may be a pamphlet rather than a book - unverified."
+    },
+    {
+      "name": "David Howard-Pitney",
+      "foreignAuthorId": "OL1009713A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "The Afro-American Jeremiad: Appeals for Justice in America", "year": 1990 },
+        { "title": "Martin Luther King Jr., Malcolm X, and the Civil Rights Struggle of the 1950s and 1960s", "year": 2004 },
+        { "title": "The African American Jeremiad: Appeals for Justice in America", "year": 2005, "note": "revised edition of the 1990 book; arguably the same work" }
+      ],
+      "openLibraryNotes": "Key is correct but most of its 16 English works are Bedford/St. Martin's course-pack bundles ('American Promise 3e V2 & Reading the American Past 3e V2 & ...'), not distinct books. This author is a good stress test for the non-book filter."
+    },
+    {
+      "name": "Eoin Colfer",
+      "foreignAuthorId": "OL1392395A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "Benny and Omar", "year": 1998 },
+        { "title": "Benny and Babe", "year": 1999 },
+        { "title": "The Wish List", "year": 2000 },
+        { "title": "Artemis Fowl", "year": 2001 },
+        { "title": "Artemis Fowl: The Arctic Incident", "year": 2002 },
+        { "title": "Artemis Fowl: The Eternity Code", "year": 2003 },
+        { "title": "The Supernaturalist", "year": 2004 },
+        { "title": "The Legend of Spud Murphy", "year": 2004 },
+        { "title": "Artemis Fowl: The Opal Deception", "year": 2005 },
+        { "title": "The Legend of Captain Crow's Teeth", "year": 2005 },
+        { "title": "Half Moon Investigations", "year": 2006 },
+        { "title": "Artemis Fowl: The Lost Colony", "year": 2006 },
+        { "title": "The Legend of the Worst Boy in the World", "year": 2007 },
+        { "title": "Airman", "year": 2008 },
+        { "title": "Artemis Fowl: The Time Paradox", "year": 2008 },
+        { "title": "And Another Thing...", "year": 2009 },
+        { "title": "Artemis Fowl: The Atlantis Complex", "year": 2010 },
+        { "title": "Plugged", "year": 2011 },
+        { "title": "Artemis Fowl: The Last Guardian", "year": 2012 },
+        { "title": "W.A.R.P.: The Reluctant Assassin", "year": 2013 },
+        { "title": "Screwed", "year": 2013 },
+        { "title": "W.A.R.P.: The Hangman's Revolution", "year": 2014 },
+        { "title": "W.A.R.P.: The Forever Man", "year": 2015 },
+        { "title": "The Fowl Twins", "year": 2019 },
+        { "title": "Highfire", "year": 2020 },
+        { "title": "The Fowl Twins Deny All Charges", "year": 2020 },
+        { "title": "The Fowl Twins Get What They Deserve", "year": 2021 },
+        { "title": "Juniper's Christmas", "year": 2023 }
+      ],
+      "openLibraryNotes": "Key is correct and unusually well populated (93 editions on Artemis Fowl). Picture books and the 'Illegal'/'Imaginary Fred' illustrated collaborations are omitted; add them if children's picture books should count. The library folder holds 'Artemis Begins', which is not an official Colfer title - likely a renamed omnibus."
+    },
+    {
+      "name": "Frank Herbert",
+      "foreignAuthorId": "OL79034A",
+      "confidence": "high",
+      "titles": [],
+      "openLibraryNotes": "Full list lives in expected_bibliographies.json - this author is wired into the accuracy fixture."
+    },
+    {
+      "name": "Brian Herbert",
+      "foreignAuthorId": "OL1194290A",
+      "confidence": "high",
+      "titles": [],
+      "openLibraryNotes": "Full list lives in expected_bibliographies.json - this author is wired into the accuracy fixture."
+    },
+    {
+      "name": "Gareth Brown",
+      "foreignAuthorId": "OL2779405A",
+      "confidence": "high",
+      "titles": [
+        { "title": "The Book of Doors", "year": 2024 },
+        { "title": "The Society of Unknowable Objects", "year": 2025 }
+      ],
+      "openLibraryNotes": "CONFLATED KEY. OL2779405A holds both this Gareth Brown (Scottish novelist, NHS Scotland) and an unrelated one who writes about scooter culture - 'Scooter Boys' (1996), 'Mods and Rockers' (2022), plus 'Short Fat Chick to Marathon Runner'. Four of six English works under the key are not his."
+    },
+    {
+      "name": "J. K. Rowling",
+      "foreignAuthorId": "OL23919A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Harry Potter and the Philosopher's Stone", "year": 1997 },
+        { "title": "Harry Potter and the Chamber of Secrets", "year": 1998 },
+        { "title": "Harry Potter and the Prisoner of Azkaban", "year": 1999 },
+        { "title": "Harry Potter and the Goblet of Fire", "year": 2000 },
+        { "title": "Harry Potter and the Order of the Phoenix", "year": 2003 },
+        { "title": "Harry Potter and the Half-Blood Prince", "year": 2005 },
+        { "title": "Harry Potter and the Deathly Hallows", "year": 2007 },
+        { "title": "The Casual Vacancy", "year": 2012 },
+        { "title": "The Ickabog", "year": 2020 },
+        { "title": "The Christmas Pig", "year": 2021 }
+      ],
+      "openLibraryNotes": "Key is correct. Two scope calls worth revisiting: the Cormoran Strike novels are published as Robert Galbraith and are excluded here as a separate authorial identity, and the Hogwarts Library companions (Fantastic Beasts, Quidditch Through the Ages, Tales of Beedle the Bard) are excluded as companion volumes. Open Library files all of them under this key."
+    },
+    {
+      "name": "J. R. R. Tolkien",
+      "foreignAuthorId": "OL26320A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "The Hobbit", "year": 1937 },
+        { "title": "Farmer Giles of Ham", "year": 1949 },
+        { "title": "The Fellowship of the Ring", "year": 1954 },
+        { "title": "The Two Towers", "year": 1954 },
+        { "title": "The Return of the King", "year": 1955 },
+        { "title": "The Adventures of Tom Bombadil", "year": 1962 },
+        { "title": "Tree and Leaf", "year": 1964 },
+        { "title": "Smith of Wootton Major", "year": 1967 }
+      ],
+      "openLibraryNotes": "SCOPE CALL, flag for review. Applying the Frank Herbert precedent - no posthumous assemblies - excludes The Silmarillion, Unfinished Tales, The Children of Hurin, Beren and Luthien, The Fall of Gondolin and all twelve History of Middle-earth volumes, all edited by Christopher Tolkien after 1973. That is defensible but leaves only the eight works published in Tolkien's lifetime, and most readers would expect The Silmarillion. Open Library lists 204 English works under this key."
+    },
+    {
+      "name": "John Steinbeck",
+      "foreignAuthorId": "OL25788A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Cup of Gold", "year": 1929 },
+        { "title": "The Pastures of Heaven", "year": 1932 },
+        { "title": "To a God Unknown", "year": 1933 },
+        { "title": "Tortilla Flat", "year": 1935 },
+        { "title": "In Dubious Battle", "year": 1936 },
+        { "title": "Of Mice and Men", "year": 1937 },
+        { "title": "The Red Pony", "year": 1937 },
+        { "title": "The Grapes of Wrath", "year": 1939 },
+        { "title": "The Moon Is Down", "year": 1942 },
+        { "title": "Cannery Row", "year": 1945 },
+        { "title": "The Pearl", "year": 1947 },
+        { "title": "The Wayward Bus", "year": 1947 },
+        { "title": "Burning Bright", "year": 1950 },
+        { "title": "East of Eden", "year": 1952 },
+        { "title": "Sweet Thursday", "year": 1954 },
+        { "title": "The Short Reign of Pippin IV", "year": 1957 },
+        { "title": "The Winter of Our Discontent", "year": 1961 }
+      ],
+      "openLibraryNotes": "Key is correct. Novels only. His non-fiction (Sea of Cortez, A Russian Journal, Travels with Charley, America and Americans, Once There Was a War) and the story collection The Long Valley are excluded by scope, as is the posthumous Acts of King Arthur. Open Library dates two works to 1611 and 1695, which is a good calendar-corruption test case."
+    },
+    {
+      "name": "Lev Grossman",
+      "foreignAuthorId": "OL391079A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Warp", "year": 1997 },
+        { "title": "Codex", "year": 2004 },
+        { "title": "The Magicians", "year": 2009 },
+        { "title": "The Magician King", "year": 2011 },
+        { "title": "The Magician's Land", "year": 2014 },
+        { "title": "The Silver Arrow", "year": 2020 },
+        { "title": "The Golden Swift", "year": 2022 },
+        { "title": "The Bright Sword", "year": 2024 },
+        { "title": "The God of Sleep", "year": 2026 }
+      ],
+      "openLibraryNotes": "Key is correct. 'Dangerous Women', 'Unfettered' and 'Other Worlds Than These' are anthologies he contributed to; Open Library files them under this key and they should be filtered as such."
+    },
+    {
+      "name": "Matt Dinniman",
+      "foreignAuthorId": "OL3101279A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "The Shivered Sky", "year": 2003 },
+        { "title": "Dominion of Blades", "year": 2017 },
+        { "title": "The Hobgoblin Riot", "year": 2018 },
+        { "title": "Dungeon Crawler Carl", "year": 2020 },
+        { "title": "Carl's Doomsday Scenario", "year": 2021 },
+        { "title": "The Dungeon Anarchist's Cookbook", "year": 2021 },
+        { "title": "The Gate of the Feral Gods", "year": 2021 },
+        { "title": "The Butcher's Masquerade", "year": 2022 },
+        { "title": "The Eye of the Bedlam Bride", "year": 2023 },
+        { "title": "This Inevitable Ruin", "year": 2024 },
+        { "title": "A Parade of Horribles", "year": 2026 },
+        { "title": "Operation Bounce House", "year": 2026 }
+      ],
+      "openLibraryNotes": "Key is correct. Sources disagree about The Shivered Sky: Open Library has it as a single 2003 book, one reading-order site splits it into a three-book series (Every Grain of Sand / In the City of Demons / The Great Devouring Darkness). Listed as one book, unverified. Open Library also shows a 2026 'Traps and Specters' not corroborated elsewhere."
+    },
+    {
+      "name": "Oscar Ratti",
+      "foreignAuthorId": "OL2035689A",
+      "confidence": "medium",
+      "titles": [
+        { "title": "Aikido and the Dynamic Sphere", "year": 1970, "note": "with Adele Westbrook" },
+        { "title": "Secrets of the Samurai: The Martial Arts of Feudal Japan", "year": 1973, "note": "with Adele Westbrook" }
+      ],
+      "openLibraryNotes": "Key is correct. Ratti was primarily the illustrator on both, Westbrook the writer, but both are credited as authors throughout. 'The Medieval Health Handbook' and 'Tales of the Hermit' appear under the key and are unverified as his own books."
+    },
+    {
+      "name": "Sidney Sheldon",
+      "foreignAuthorId": "OL225246A",
+      "confidence": "high",
+      "titles": [
+        { "title": "The Naked Face", "year": 1970 },
+        { "title": "The Other Side of Midnight", "year": 1973 },
+        { "title": "A Stranger in the Mirror", "year": 1976 },
+        { "title": "Bloodline", "year": 1977 },
+        { "title": "Rage of Angels", "year": 1980 },
+        { "title": "Master of the Game", "year": 1982 },
+        { "title": "If Tomorrow Comes", "year": 1985 },
+        { "title": "Windmills of the Gods", "year": 1987 },
+        { "title": "The Sands of Time", "year": 1988 },
+        { "title": "Memories of Midnight", "year": 1990 },
+        { "title": "The Doomsday Conspiracy", "year": 1991 },
+        { "title": "The Stars Shine Down", "year": 1992 },
+        { "title": "Nothing Lasts Forever", "year": 1994 },
+        { "title": "Morning, Noon and Night", "year": 1995 },
+        { "title": "The Best Laid Plans", "year": 1997 },
+        { "title": "Tell Me Your Dreams", "year": 1998 },
+        { "title": "The Sky Is Falling", "year": 2000 },
+        { "title": "Are You Afraid of the Dark?", "year": 2004 }
+      ],
+      "openLibraryNotes": "Key is correct. The 18 novels; his memoir The Other Side of Me (2005) is excluded by scope, as are the posthumous 'Sidney Sheldon's ...' continuations written by Tilly Bagshawe, which Open Library files under this key. Open Library dates Master of the Game to 1905."
+    },
+    {
+      "name": "Sophia Turner",
+      "foreignAuthorId": null,
+      "confidence": "high",
+      "titles": [
+        { "title": "Machines of Consent", "year": 2025 }
+      ],
+      "openLibraryNotes": "NOT IN OPEN LIBRARY. A direct title search for 'Machines of Consent' returns nothing related. The author-name search resolves to OL3716471A, an unrelated Sophia Turner who wrote 'Devastating Truth' (2005). This book is unreachable from Open Library at any filter setting, and is the clearest single argument in this library for a second IBookMetadataProvider. Debut novel; the author is a New Zealand programming-language designer."
+    },
+    {
+      "name": "Tim Berners-Lee",
+      "foreignAuthorId": "OL25245A",
+      "confidence": "high",
+      "titles": [
+        { "title": "Weaving the Web", "year": 1999, "note": "with Mark Fischetti" },
+        { "title": "This Is for Everyone", "year": 2025, "note": "with Stephen Witt" }
+      ],
+      "openLibraryNotes": "Key is correct. 'Spinning the Semantic Web' and 'A Framework for Web Science' are academic volumes he contributed to rather than authored, and 'The WWW Virtual Library' is not a book."
+    },
+    {
+      "name": "Trudi Canavan",
+      "foreignAuthorId": "OL2629960A",
+      "confidence": "high",
+      "titles": [],
+      "openLibraryNotes": "Full list lives in expected_bibliographies.json - this author is wired into the accuracy fixture."
+    }
+  ]
+}
