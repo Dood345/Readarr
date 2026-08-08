@@ -54,9 +54,13 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         /// </summary>
         private static IEnumerable<AuthorCase> Cases()
         {
-            yield return new AuthorCase("OL79034A", "Frank Herbert", "frank_herbert_works.json", 1.00, 0.20);
-            yield return new AuthorCase("OL2629960A", "Trudi Canavan", "trudi_canavan_works.json", 1.00, 0.20);
-            yield return new AuthorCase("OL1194290A", "Brian Herbert", "brian_herbert_works.json", 0.70, 0.20);
+            // Precision floors sit below what each author currently scores (43%, 100%, 65%) so
+            // ordinary upstream drift does not turn this red. Frank Herbert's is lowest because his
+            // catalogue carries the most short fiction and posthumous collections, which are real
+            // books but not novels, and the corpus counts only novels.
+            yield return new AuthorCase("OL79034A", "Frank Herbert", "frank_herbert", 1.00, 0.35);
+            yield return new AuthorCase("OL2629960A", "Trudi Canavan", "trudi_canavan", 1.00, 0.85);
+            yield return new AuthorCase("OL1194290A", "Brian Herbert", "brian_herbert", 1.00, 0.55);
         }
 
         [OneTimeSetUp]
@@ -131,9 +135,13 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         {
             var result = Score(testCase);
 
+            // Precision counts a record as good if it is a real book, so it says nothing about the
+            // same book arriving twice. Duplicates are reported separately because they are a
+            // deduplication problem, not a filtering one, and the two are fixed in different places.
             TestContext.Out.WriteLine(
                 $"{testCase.Name,-16} returned {result.Returned,4}   found {result.Matched,3}/{result.Available,-3}" +
-                $"   recall {result.Recall,6:P0}   precision {result.Precision,6:P0}");
+                $"   recall {result.Recall,6:P0}   precision {result.Precision,6:P0}" +
+                $"   duplicate records {result.DuplicateRecords,3}");
 
             foreach (var junk in result.Unrecognised)
             {
@@ -146,9 +154,13 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
             var author = _expected.Authors.Single(x => x.ForeignAuthorId == testCase.ForeignAuthorId);
             var titles = GetBibliography(testCase, author.Name);
 
-            // Recall is measured against what Open Library can actually supply. Holding the pipeline
-            // responsible for records that do not exist would make the number meaningless.
-            var available = author.Titles.Where(x => !author.Unavailable.Contains(x)).ToList();
+            // Recall is measured against what Open Library can actually supply, and supply with a
+            // language on it. Holding the pipeline responsible for records that do not exist, or
+            // that upstream will not say are English, would make the number meaningless.
+            var available = author.Titles
+                .Where(x => !author.Unavailable.Contains(x))
+                .Where(x => !author.NoLanguageData.Contains(x))
+                .ToList();
             var matched = available.Where(x => titles.Any(t => Matches(t, author.TitleFor(x)))).ToList();
             var recognised = titles.Where(t => author.Titles.Any(x => Matches(t, author.TitleFor(x)))).ToList();
 
@@ -160,15 +172,15 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
                 Recall = available.Count == 0 ? 1.0 : (double)matched.Count / available.Count,
                 Precision = titles.Count == 0 ? 0.0 : (double)recognised.Count / titles.Count,
                 Missing = available.Except(matched).ToList(),
-                Unrecognised = titles.Except(recognised).ToList()
+                Unrecognised = titles.Except(recognised).ToList(),
+
+                // Records that are a real book, beyond the first for each distinct book.
+                DuplicateRecords = recognised.Count - matched.Count
             };
         }
 
         private List<string> GetBibliography(AuthorCase testCase, string name)
         {
-            var payload = JsonSerializer.Deserialize<OpenLibrarySearchResponse>(
-                ReadAllText($@"Files/MetadataSource/OpenLibrary/{testCase.Payload}"), Options);
-
             Mocker.GetMock<IOpenLibraryProxy>()
                 .Setup(x => x.GetAuthor(It.IsAny<string>()))
                 .Returns(new OpenLibraryAuthorResource
@@ -178,8 +190,8 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
                 });
 
             Mocker.GetMock<IOpenLibraryProxy>()
-                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>()))
-                .Returns(payload.Docs);
+                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>(), "eng"))
+                .Returns(Payload($"{testCase.Payload}_works_english.json"));
 
             // Audible enrichment is best-effort and irrelevant to which works make the bibliography.
             Mocker.GetMock<IAudibleProxy>()
@@ -190,6 +202,14 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
                 .Books.Value
                 .Select(x => x.Title)
                 .ToList();
+        }
+
+        private List<OpenLibrarySearchDoc> Payload(string file)
+        {
+            return JsonSerializer
+                .Deserialize<OpenLibrarySearchResponse>(
+                    ReadAllText($@"Files/MetadataSource/OpenLibrary/{file}"), Options)
+                .Docs;
         }
 
         /// <summary>
@@ -316,6 +336,7 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
             public double Precision { get; set; }
             public List<string> Missing { get; set; }
             public List<string> Unrecognised { get; set; }
+            public int DuplicateRecords { get; set; }
         }
 
         private class ExpectedBibliographies
@@ -339,8 +360,15 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
             [JsonPropertyName("aliases")]
             public Dictionary<string, string> Aliases { get; set; } = new ();
 
+            /// <summary>Open Library has no record of these at all.</summary>
             [JsonPropertyName("unavailable")]
             public List<string> Unavailable { get; set; } = new ();
+
+            /// <summary>
+            /// Open Library has these but records no language, so the language=eng query drops them.
+            /// </summary>
+            [JsonPropertyName("noLanguageData")]
+            public List<string> NoLanguageData { get; set; } = new ();
 
             public string TitleFor(string publishedTitle)
             {

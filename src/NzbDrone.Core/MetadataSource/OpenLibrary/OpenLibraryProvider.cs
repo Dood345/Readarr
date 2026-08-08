@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
@@ -30,6 +31,82 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         // as the same book recorded twice.
         private const double ContainmentWordRatio = 0.6;
 
+        private const string EnglishLanguageCode = "eng";
+
+        // Credited authors at or above which a record is an anthology rather than the author's book.
+        // Five, not four: "The Road to Dune" credits four and is a real book, where the anthologies
+        // worth dropping ("Five Fates", "TV 2000" with nineteen) all credit five or more. A
+        // four-author anthology therefore survives, which is the better way round to be wrong.
+        private const int MinAuthorsForAnthology = 5;
+
+        /// <summary>
+        /// Things Open Library files against an author that nobody would download as a book. Matched
+        /// against the raw title, case-insensitively.
+        /// </summary>
+        private static readonly Regex[] NonBookProductPatterns =
+        {
+            // Collections that ship several books as one product.
+            new Regex(@"\bbox(ed)?[ -]?set\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bomnibus\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcomplete series\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b(complete|unpublished) novels\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcollection-\d+\s*vol", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bset of \d+ books?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b\d+[- ]book\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\(set\)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Merchandise and adaptations.
+            new Regex(@"\bcolou?ring book\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcalendar\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bgraphic novel\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcomic (bk|book)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcassette\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bsparknotes\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bstudy guide\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bnotebooks of\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Retail display units and publisher stock codes: "Trudi Canavan Header Whsmith",
+            // "Herbert 15mxpk", "Herbert Tie-in 20mfl".
+            new Regex(@"\bwhsmith\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b\d+m[a-z]{2,}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // A single book split across volumes: "Dune Messiah (1 of 2)".
+            new Regex(@"\(\d+ of \d+\)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Magazine issues the author has a story in.
+            new Regex(@"\banalog\b.*\b(19|20)\d\d\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\banalog science fiction\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bscience fiction magazine\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bvolume [\divxl]+, no\.", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        };
+
+        /*
+         * On the works `language=eng` leaves behind, and why nothing here tries to recover them.
+         *
+         * The filter is applied by the search endpoint rather than to the language field it projects
+         * back, because most translation records carry no language field at all and a client-side
+         * filter kept every one of them - 83 of Trudi Canavan's 131 works, leaving one real book in
+         * five.
+         *
+         * The cost is that works Open Library holds no language data for are dropped too, and a few
+         * are real English books: `Hunters of Dune` and `Hellhole Awakening` in the corpus behind
+         * BibliographyAccuracyFixture.
+         *
+         * Confirming those against /works/{key}/editions.json was tried and does not work. That
+         * endpoint has no language data for them either - `Hunters of Dune` has a single edition
+         * whose `languages` is null, though its publisher is Hodder & Stoughton. Measured across all
+         * 75 works in the corpus that would have been probed, the number recovered was zero. It is
+         * one request per work for nothing.
+         *
+         * Title heuristics were tried too and leak badly: Polish, Turkish and Dutch titles routinely
+         * carry neither an accent nor a leading article, so `Wielki Mistrz`, `Zlodziejska magia` and
+         * `Misja ambasadora` all read as English.
+         *
+         * So two books in sixty-nine are knowingly given up. Anyone revisiting this needs a source
+         * that actually knows the language - a second IBookMetadataProvider - not another pass over
+         * the same empty field.
+         */
+
         private readonly IOpenLibraryProxy _openLibrary;
         private readonly IAudibleProxy _audible;
         private readonly Logger _logger;
@@ -54,7 +131,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             }
 
             var metadata = MapAuthorMetadata(resource, key);
-            var docs = _openLibrary.GetWorksByAuthor(key, MaxWorksPerAuthor);
+            var docs = _openLibrary.GetWorksByAuthor(key, MaxWorksPerAuthor, EnglishLanguageCode);
 
             var audibleProducts = _audible.SearchByAuthor(metadata.Name, MaxAudibleResults);
             var audibleByTitle = IndexByTitle(audibleProducts);
@@ -77,6 +154,18 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         }
 
         /// <summary>
+        /// Open Library files a good deal that is not a book against an author: calendars, colouring
+        /// books, magazine issues the author has a story in, box sets, study guides, split volumes
+        /// ("Dune Messiah (1 of 2)") and publisher stock codes ("Herbert 15mxpk").
+        /// </summary>
+        private static bool IsNonBookProduct(string title)
+        {
+            var normalized = title ?? string.Empty;
+
+            return NonBookProductPatterns.Any(x => x.IsMatch(normalized));
+        }
+
+        /// <summary>
         /// Open Library holds several work records for the same book, and separate records for
         /// collections, so an author's bibliography arrives with noise in it. Two shapes are dealt
         /// with here, in this order:
@@ -93,7 +182,8 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         {
             var all = docs
                 .Where(x => x.Key.IsNotNullOrWhiteSpace())
-                .Where(HasEnglishEdition)
+                .Where(x => !IsNonBookProduct(x.Title))
+                .Where(x => !IsAnthologyContribution(x))
                 .Select(x => new WorkTitle(x, NormalizeTitle(x.Title, stripSubtitle: false)))
                 .Where(x => x.Normalized.IsNotNullOrWhiteSpace())
                 .ToList();
@@ -139,16 +229,18 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         }
 
         /// <summary>
-        /// Open Library lists translations as works in their own right, so an author's bibliography
-        /// arrives with the German, Spanish, Polish and Portuguese editions of books already in it -
-        /// 16 of Trudi Canavan's 131 works. A work is kept when it says nothing about language,
-        /// since unknown is not the same as "not English".
+        /// An anthology the author contributed a single story to, rather than a book they wrote.
+        /// Credited-author count is the usable signal: "TV 2000" lists nineteen, and one Frank
+        /// Herbert record lists eighty-six.
         /// </summary>
-        private static bool HasEnglishEdition(OpenLibrarySearchDoc doc)
+        /// <remarks>
+        /// The threshold has to clear genuine collaborations, which is why it is four rather than
+        /// two: Frank Herbert's Pandora novels with Bill Ransom carry three credited authors and
+        /// must survive.
+        /// </remarks>
+        private static bool IsAnthologyContribution(OpenLibrarySearchDoc doc)
         {
-            return doc.Language == null
-                   || doc.Language.Count == 0
-                   || doc.Language.Contains("eng");
+            return (doc.AuthorNames?.Count ?? 0) >= MinAuthorsForAnthology;
         }
 
         /// <summary>

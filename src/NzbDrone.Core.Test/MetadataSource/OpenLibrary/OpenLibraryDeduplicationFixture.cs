@@ -34,8 +34,16 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
                 .Setup(x => x.GetAuthor(It.IsAny<string>()))
                 .Returns(new OpenLibraryAuthorResource { Key = "/authors/OL1A", Name = "Frank Herbert" });
 
+            // The provider asks twice - once restricted to English, once unrestricted - and resolves
+            // the difference. These works declare no language, so serving both from the same list
+            // puts every one of them in the English set and leaves nothing to resolve, which keeps
+            // these cases about deduplication alone.
             Mocker.GetMock<IOpenLibraryProxy>()
-                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>()))
+                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>(), "eng"))
+                .Returns(works.ToList());
+
+            Mocker.GetMock<IOpenLibraryProxy>()
+                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>(), null))
                 .Returns(works.ToList());
 
             Mocker.GetMock<IAudibleProxy>()

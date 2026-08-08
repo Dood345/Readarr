@@ -9,8 +9,16 @@
     "title. Open Library drops the 'Dune:' marketing prefix from the prequels and omits subtitles.",
     "This is domain knowledge, not a test workaround - the two strings name one book.",
     "",
-    "'unavailable' records books Open Library genuinely cannot supply, verified by direct title",
-    "search. These cap achievable recall and are the argument for a second IBookMetadataProvider."
+    "Two kinds of book are excluded from the recall denominator, for different reasons, and the",
+    "distinction is kept sharp on purpose - neither is a book our own filtering lost:",
+    "",
+    "  'unavailable'    - Open Library has no record at all, verified by direct title search.",
+    "  'noLanguageData' - Open Library has the book but records no language for it, so the",
+    "                     language=eng query necessarily drops it. Confirming these against",
+    "                     /works/{key}/editions.json was tried and fails: that endpoint has no",
+    "                     language for them either. See the note in OpenLibraryProvider.",
+    "",
+    "Both cap achievable recall and are the argument for a second IBookMetadataProvider."
   ],
   "authors": [
     {
@@ -128,6 +136,10 @@
         "Hellhole Inferno",
         "Dune: The Lady of Caladan",
         "Dune: The Heir of Caladan"
+      ],
+      "noLanguageData": [
+        "Hunters of Dune",
+        "Hellhole Awakening"
       ]
     }
   ]
