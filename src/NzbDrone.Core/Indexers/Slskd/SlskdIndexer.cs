@@ -156,7 +156,7 @@ namespace NzbDrone.Core.Indexers.Slskd
 
             return new ReleaseInfo
             {
-                Guid = $"Slskd-{response.Username}-{directory.GetHashCode():X8}",
+                Guid = SlskdIds.ForDownload(response.Username, directory),
                 Title = title,
                 Size = files.Sum(f => f.Size),
                 DownloadUrl = locator.ToDownloadUrl(),

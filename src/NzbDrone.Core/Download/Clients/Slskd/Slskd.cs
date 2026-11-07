@@ -98,9 +98,11 @@ namespace NzbDrone.Core.Download.Clients.Slskd
                 DownloadId = BuildDownloadId(user.Username, directory.Directory),
                 Title = GetLeafName(directory.Directory),
 
-                // Non-empty so CompletedDownloadService will still consider imports that Readarr
-                // did not grab itself, matching what the blackhole clients do.
-                Category = "Readarr",
+                // A download Readarr grabbed is matched through its history and imported whatever
+                // the category. A non-empty category is what makes CompletedDownloadService also
+                // consider folders Readarr did not grab, so it is set only for folders that look
+                // like books - see ShouldAdopt.
+                Category = ShouldAdopt(files, Settings) ? "Readarr" : null,
                 TotalSize = totalSize,
                 RemainingSize = Math.Max(0, totalSize - transferred),
                 Status = MapStatus(files),
@@ -195,7 +197,47 @@ namespace NzbDrone.Core.Download.Clients.Slskd
 
         private static string BuildDownloadId(string username, string directory)
         {
-            return $"Slskd-{username}-{directory.GetHashCode():X8}";
+            return SlskdIds.ForDownload(username, directory);
+        }
+
+        /// <summary>
+        /// Whether a finished folder Readarr did not grab itself should be offered for import.
+        /// slskd's download folder is shared with whatever else uses the daemon - here Lidarr's
+        /// music via soularr - and adopting everything meant a full tag scan and a queue warning
+        /// for every album that landed there (300 of them in two months). A folder is adopted only
+        /// when the user asked for it and it holds at least one file in a book format.
+        /// </summary>
+        internal static bool ShouldAdopt(List<SlskdTransferFile> files, SlskdSettings settings)
+        {
+            if (!settings.ImportUngrabbedDownloads)
+            {
+                return false;
+            }
+
+            var bookExtensions = (settings.BookExtensions ?? string.Empty)
+                .Split(',')
+                .Select(e => e.Trim().TrimStart('.').ToLowerInvariant())
+                .Where(e => e.IsNotNullOrWhiteSpace())
+                .ToHashSet();
+
+            if (bookExtensions.Empty())
+            {
+                return true;
+            }
+
+            return files.Any(f => bookExtensions.Contains(GetExtension(f.Filename)));
+        }
+
+        private static string GetExtension(string filename)
+        {
+            if (filename.IsNullOrWhiteSpace())
+            {
+                return string.Empty;
+            }
+
+            var index = filename.LastIndexOf('.');
+
+            return index < 0 ? string.Empty : filename.Substring(index + 1).ToLowerInvariant();
         }
 
         private static string GetLeafName(string directory)
