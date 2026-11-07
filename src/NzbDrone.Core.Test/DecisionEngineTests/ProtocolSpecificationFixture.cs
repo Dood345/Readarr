@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.Linq;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
@@ -31,16 +32,21 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
                   .Returns(_delayProfile);
         }
 
-        private void GivenProtocol(DownloadProtocol downloadProtocol)
+        private void GivenProtocol(string downloadProtocol)
         {
             _remoteBook.Release.DownloadProtocol = downloadProtocol;
+        }
+
+        private void GivenProtocolAllowed(string protocol, bool allowed)
+        {
+            _delayProfile.Items.Single(x => x.Protocol == protocol).Allowed = allowed;
         }
 
         [Test]
         public void should_be_true_if_usenet_and_usenet_is_enabled()
         {
-            GivenProtocol(DownloadProtocol.Usenet);
-            _delayProfile.EnableUsenet = true;
+            GivenProtocol(nameof(UsenetDownloadProtocol));
+            GivenProtocolAllowed(nameof(UsenetDownloadProtocol), true);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().Be(true);
         }
@@ -48,8 +54,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_be_true_if_torrent_and_torrent_is_enabled()
         {
-            GivenProtocol(DownloadProtocol.Torrent);
-            _delayProfile.EnableTorrent = true;
+            GivenProtocol(nameof(TorrentDownloadProtocol));
+            GivenProtocolAllowed(nameof(TorrentDownloadProtocol), true);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().Be(true);
         }
@@ -57,8 +63,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_be_false_if_usenet_and_usenet_is_disabled()
         {
-            GivenProtocol(DownloadProtocol.Usenet);
-            _delayProfile.EnableUsenet = false;
+            GivenProtocol(nameof(UsenetDownloadProtocol));
+            GivenProtocolAllowed(nameof(UsenetDownloadProtocol), false);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().Be(false);
         }
@@ -66,8 +72,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_be_false_if_torrent_and_torrent_is_disabled()
         {
-            GivenProtocol(DownloadProtocol.Torrent);
-            _delayProfile.EnableTorrent = false;
+            GivenProtocol(nameof(TorrentDownloadProtocol));
+            GivenProtocolAllowed(nameof(TorrentDownloadProtocol), false);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().Be(false);
         }

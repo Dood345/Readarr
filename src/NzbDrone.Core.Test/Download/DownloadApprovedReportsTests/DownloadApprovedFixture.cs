@@ -38,7 +38,7 @@ namespace NzbDrone.Core.Test.Download.DownloadApprovedReportsTests
                             .Build();
         }
 
-        private RemoteBook GetRemoteBook(List<Book> books, QualityModel quality, DownloadProtocol downloadProtocol = DownloadProtocol.Usenet)
+        private RemoteBook GetRemoteBook(List<Book> books, QualityModel quality, string downloadProtocol = nameof(UsenetDownloadProtocol))
         {
             var remoteBook = new RemoteBook();
             remoteBook.ParsedBookInfo = new ParsedBookInfo();
@@ -253,19 +253,19 @@ namespace NzbDrone.Core.Test.Download.DownloadApprovedReportsTests
         public async Task should_not_add_to_failed_if_failed_for_a_different_protocol()
         {
             var books = new List<Book> { GetBook(1) };
-            var remoteBook = GetRemoteBook(books, new QualityModel(Quality.MP3), DownloadProtocol.Usenet);
-            var remoteBook2 = GetRemoteBook(books, new QualityModel(Quality.MP3), DownloadProtocol.Torrent);
+            var remoteBook = GetRemoteBook(books, new QualityModel(Quality.MP3), nameof(UsenetDownloadProtocol));
+            var remoteBook2 = GetRemoteBook(books, new QualityModel(Quality.MP3), nameof(TorrentDownloadProtocol));
 
             var decisions = new List<DownloadDecision>();
             decisions.Add(new DownloadDecision(remoteBook));
             decisions.Add(new DownloadDecision(remoteBook2));
 
-            Mocker.GetMock<IDownloadService>().Setup(s => s.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == DownloadProtocol.Usenet), null))
+            Mocker.GetMock<IDownloadService>().Setup(s => s.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == nameof(UsenetDownloadProtocol)), null))
                   .Throws(new DownloadClientUnavailableException("Download client failed"));
 
             await Subject.ProcessDecisions(decisions);
-            Mocker.GetMock<IDownloadService>().Verify(v => v.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == DownloadProtocol.Usenet), null), Times.Once());
-            Mocker.GetMock<IDownloadService>().Verify(v => v.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == DownloadProtocol.Torrent), null), Times.Once());
+            Mocker.GetMock<IDownloadService>().Verify(v => v.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == nameof(UsenetDownloadProtocol)), null), Times.Once());
+            Mocker.GetMock<IDownloadService>().Verify(v => v.DownloadReport(It.Is<RemoteBook>(r => r.Release.DownloadProtocol == nameof(TorrentDownloadProtocol)), null), Times.Once());
         }
 
         [Test]

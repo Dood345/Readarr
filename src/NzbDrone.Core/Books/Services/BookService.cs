@@ -74,7 +74,19 @@ namespace NzbDrone.Core.Books
             editions.ForEach(x => x.BookId = newBook.Id);
 
             _editionService.InsertMany(editions.Where(x => x.Id == 0).ToList());
-            _editionService.SetMonitored(editions.FirstOrDefault(x => x.Monitored) ?? editions.First());
+
+            // One monitored edition per media type, so set each rather than collapsing to one.
+            var toMonitor = editions.MonitoredEditions()
+                .GroupBy(x => x.MediaType())
+                .Select(g => g.First())
+                .ToList();
+
+            if (!toMonitor.Any())
+            {
+                toMonitor.Add(editions.First());
+            }
+
+            toMonitor.ForEach(x => _editionService.SetMonitored(x));
 
             _eventAggregator.PublishEvent(new BookAddedEvent(GetBook(newBook.Id), doRefresh));
 

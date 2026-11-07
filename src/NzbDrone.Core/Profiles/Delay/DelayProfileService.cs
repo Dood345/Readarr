@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Cache;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Indexers;
 
 namespace NzbDrone.Core.Profiles.Delay
 {
@@ -23,10 +24,14 @@ namespace NzbDrone.Core.Profiles.Delay
     {
         private readonly IDelayProfileRepository _repo;
         private readonly ICached<DelayProfile> _bestForTagsCache;
+        private readonly List<IDownloadProtocol> _downloadProtocols;
 
-        public DelayProfileService(IDelayProfileRepository repo, ICacheManager cacheManager)
+        public DelayProfileService(IDelayProfileRepository repo,
+                                   IEnumerable<IDownloadProtocol> downloadProtocols,
+                                   ICacheManager cacheManager)
         {
             _repo = repo;
+            _downloadProtocols = downloadProtocols.ToList();
             _bestForTagsCache = cacheManager.GetCache<DelayProfile>(GetType(), "best");
         }
 
@@ -69,12 +74,12 @@ namespace NzbDrone.Core.Profiles.Delay
 
         public List<DelayProfile> All()
         {
-            return _repo.All().ToList();
+            return _repo.All().Select(AddMissingItems).ToList();
         }
 
         public DelayProfile Get(int id)
         {
-            return _repo.Get(id);
+            return AddMissingItems(_repo.Get(id));
         }
 
         public List<DelayProfile> AllForTag(int tagId)
@@ -163,6 +168,41 @@ namespace NzbDrone.Core.Profiles.Delay
             }
 
             return after.Order;
+        }
+
+        /// <summary>
+        /// Reconciles a stored profile against the protocols actually registered. A protocol added
+        /// after the profile was saved appears here rather than being silently absent - without
+        /// this, IsAllowedProtocol returns false for it and ProtocolSpecification rejects every
+        /// release on that protocol with no obvious cause. New protocols default to not allowed so
+        /// enabling one stays a deliberate act.
+        /// </summary>
+        private DelayProfile AddMissingItems(DelayProfile profile)
+        {
+            if (profile == null)
+            {
+                return null;
+            }
+
+            profile.Items ??= new List<DelayProfileProtocolItem>();
+
+            var missing = _downloadProtocols.Where(x => !profile.Items.Any(i => i.Protocol == x.GetType().Name));
+            profile.Items.AddRange(missing.Select(x => GetProtocolItem(x, false)));
+
+            var protocolNames = _downloadProtocols.Select(x => x.GetType().Name).ToList();
+            profile.Items.RemoveAll(x => !protocolNames.Contains(x.Protocol));
+
+            return profile;
+        }
+
+        private DelayProfileProtocolItem GetProtocolItem(IDownloadProtocol protocol, bool allowed)
+        {
+            return new DelayProfileProtocolItem
+            {
+                Name = protocol.GetType().Name.Replace("DownloadProtocol", ""),
+                Protocol = protocol.GetType().Name,
+                Allowed = allowed
+            };
         }
     }
 }

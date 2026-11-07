@@ -141,6 +141,24 @@ class Naming extends Component {
                 />
               </FormGroup>
 
+              {
+                renameBooks ?
+                  <FormGroup size={sizes.MEDIUM}>
+                    <FormLabel>
+                      {translate('KeepPartFileNames')}
+                    </FormLabel>
+
+                    <FormInputGroup
+                      type={inputTypes.CHECK}
+                      name="keepPartFileNames"
+                      helpText={translate('KeepPartFileNamesHelpText')}
+                      onChange={onInputChange}
+                      {...settings.keepPartFileNames}
+                    />
+                  </FormGroup> :
+                  null
+              }
+
               <FormGroup size={sizes.MEDIUM}>
                 <FormLabel>
                   {translate('ReplaceIllegalCharacters')}

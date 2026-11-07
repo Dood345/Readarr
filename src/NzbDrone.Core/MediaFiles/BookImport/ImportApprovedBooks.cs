@@ -91,6 +91,19 @@ namespace NzbDrone.Core.MediaFiles.BookImport
             var addedAuthors = new List<Author>();
             var addedBooks = new List<Book>();
 
+            // A rescan that re-identifies known files can decide the same file twice: once from
+            // its own folder and once pulled in as an "existing file" of a sibling book's
+            // candidate edition. Keep the closer match. Two records for one path would violate
+            // the unique index on insert - after the previous records had already been deleted,
+            // which took every file in the batch out of the database.
+            decisions = decisions
+                .Where(e => !e.Item.ExistingFile)
+                .Concat(decisions
+                    .Where(e => e.Item.ExistingFile)
+                    .GroupBy(e => e.Item.Path)
+                    .Select(g => g.OrderByDescending(e => e.Approved).ThenBy(e => e.Item.Distance?.NormalizedDistance() ?? 1.0).First()))
+                .ToList();
+
             var bookDecisions = decisions.Where(e => e.Item.Book != null && e.Approved)
                 .GroupBy(e => e.Item.Book.ForeignBookId).ToList();
 
@@ -324,7 +337,16 @@ namespace NzbDrone.Core.MediaFiles.BookImport
             foreach (var bookImport in bookImports)
             {
                 var book = bookImport.First().ImportDecision.Item.Book;
-                var edition = book.Editions.Value.Single(x => x.Monitored);
+
+                // Files may have landed on either the ebook or the audiobook edition, so report the
+                // edition they were actually attached to rather than assuming a single monitored one.
+                var importedEditionIds = allImportedTrackFiles
+                    .Select(x => x.EditionId)
+                    .Concat(allOldTrackFiles.Select(x => x.EditionId))
+                    .ToHashSet();
+
+                var edition = book.Editions.Value.FirstOrDefault(x => importedEditionIds.Contains(x.Id))
+                              ?? book.Editions.Value.PrimaryEdition();
                 var author = bookImport.First().ImportDecision.Item.Author;
 
                 if (bookImport.Where(e => e.Errors.Count == 0).ToList().Count > 0 && author != null && book != null)

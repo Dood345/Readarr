@@ -451,11 +451,11 @@ namespace NzbDrone.Core.Download.Pending
             return HashConverter.GetHashInt31(string.Format("pending-{0}-book{1}", pendingRelease.Id, book.Id));
         }
 
-        private int PrioritizeDownloadProtocol(Author author, DownloadProtocol downloadProtocol)
+        private int PrioritizeDownloadProtocol(Author author, string downloadProtocol)
         {
             var delayProfile = _delayProfileService.BestForTags(author.Tags);
 
-            if (downloadProtocol == delayProfile.PreferredProtocol)
+            if (delayProfile.IsPreferredProtocol(downloadProtocol))
             {
                 return 0;
             }

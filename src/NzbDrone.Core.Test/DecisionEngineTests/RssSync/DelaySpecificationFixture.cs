@@ -34,9 +34,8 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _profile = Builder<QualityProfile>.CreateNew()
                                        .Build();
 
-            _delayProfile = Builder<DelayProfile>.CreateNew()
-                                      .With(d => d.PreferredProtocol = DownloadProtocol.Usenet)
-                                      .Build();
+            // A fresh DelayProfile already lists Usenet first, which is what makes it preferred.
+            _delayProfile = new DelayProfile();
 
             var author = Builder<Author>.CreateNew()
                                         .With(s => s.QualityProfile = _profile)
@@ -55,7 +54,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
 
             _remoteBook.ParsedBookInfo = new ParsedBookInfo();
             _remoteBook.Release = new ReleaseInfo();
-            _remoteBook.Release.DownloadProtocol = DownloadProtocol.Usenet;
+            _remoteBook.Release.DownloadProtocol = nameof(UsenetDownloadProtocol);
 
             _remoteBook.Books = Builder<Book>.CreateListOfSize(1).Build().ToList();
 
@@ -92,6 +91,11 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
                   .Returns(true);
         }
 
+        private void GivenUsenetDelay(int minutes)
+        {
+            _delayProfile.Items.Single(x => x.Protocol == nameof(UsenetDownloadProtocol)).Delay = minutes;
+        }
+
         [Test]
         public void should_be_true_when_user_invoked_search()
         {
@@ -104,7 +108,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.ParsedBookInfo.Quality = new QualityModel(Quality.MOBI);
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, new BookSearchCriteria()).Accepted.Should().BeFalse();
         }
@@ -112,7 +116,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
         [Test]
         public void should_be_true_when_profile_does_not_have_a_delay()
         {
-            _delayProfile.UsenetDelay = 0;
+            GivenUsenetDelay(0);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeTrue();
         }
@@ -123,7 +127,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
             _remoteBook.ParsedBookInfo.Quality = new QualityModel(Quality.MP3);
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeFalse();
         }
@@ -131,7 +135,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
         [Test]
         public void should_be_true_when_quality_is_last_allowed_in_profile_and_bypass_enabled()
         {
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
             _delayProfile.BypassIfHighestQuality = true;
 
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
@@ -146,7 +150,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.ParsedBookInfo.Quality = new QualityModel(Quality.MOBI);
             _remoteBook.Release.PublishDate = DateTime.UtcNow.AddHours(-10);
 
-            _delayProfile.UsenetDelay = 60;
+            GivenUsenetDelay(60);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeTrue();
         }
@@ -157,7 +161,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.ParsedBookInfo.Quality = new QualityModel(Quality.MOBI);
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeFalse();
         }
@@ -175,7 +179,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
                   .Setup(s => s.IsRevisionUpgrade(It.IsAny<QualityModel>(), It.IsAny<QualityModel>()))
                   .Returns(true);
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeTrue();
         }
@@ -193,7 +197,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
                   .Setup(s => s.IsRevisionUpgrade(It.IsAny<QualityModel>(), It.IsAny<QualityModel>()))
                   .Returns(true);
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeTrue();
         }
@@ -206,7 +210,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
 
             GivenExistingFile(new QualityModel(Quality.PDF));
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeFalse();
         }
@@ -217,7 +221,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
             _remoteBook.CustomFormatScore = 100;
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
             _delayProfile.MinimumCustomFormatScore = 50;
 
             Subject.IsSatisfiedBy(_remoteBook, null).Accepted.Should().BeFalse();
@@ -229,7 +233,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
             _remoteBook.CustomFormatScore = 5;
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
             _delayProfile.BypassIfAboveCustomFormatScore = true;
             _delayProfile.MinimumCustomFormatScore = 50;
 
@@ -242,7 +246,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests.RssSync
             _remoteBook.Release.PublishDate = DateTime.UtcNow;
             _remoteBook.CustomFormatScore = 100;
 
-            _delayProfile.UsenetDelay = 720;
+            GivenUsenetDelay(720);
             _delayProfile.BypassIfAboveCustomFormatScore = true;
             _delayProfile.MinimumCustomFormatScore = 50;
 

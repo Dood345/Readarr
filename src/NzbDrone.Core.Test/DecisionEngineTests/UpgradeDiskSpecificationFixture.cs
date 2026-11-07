@@ -86,6 +86,25 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         }
 
         [Test]
+        public void should_be_upgradable_when_existing_files_are_the_other_media_type()
+        {
+            // An ebook release is not held back by an audiobook already on disk, and vice versa.
+            _parseResultSingle.Books.First().BookFiles = new List<BookFile> { _firstFile, _secondFile };
+            _parseResultSingle.ParsedBookInfo.Quality = new QualityModel(Quality.EPUB, new Revision(version: 1));
+
+            Subject.IsSatisfiedBy(_parseResultSingle, null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_not_be_upgradable_when_existing_file_of_the_same_media_type_is_better()
+        {
+            _parseResultSingle.Books.First().BookFiles = new List<BookFile> { _firstFile };
+            _parseResultSingle.ParsedBookInfo.Quality = new QualityModel(Quality.MP3, new Revision(version: 1));
+
+            Subject.IsSatisfiedBy(_parseResultSingle, null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
         public void should_return_true_if_book_has_no_existing_file()
         {
             _parseResultSingle.Books.First().BookFiles = new List<BookFile>();

@@ -12,6 +12,7 @@ using NzbDrone.Core.HealthCheck;
 using NzbDrone.Core.Housekeeping;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.Messaging.Commands;
@@ -124,6 +125,16 @@ namespace NzbDrone.Core.Jobs
                     {
                         Interval = GetRssSyncInterval(),
                         TypeName = typeof(RssSyncCommand).FullName
+                    },
+
+                    // Soulseek has no feed to poll, so RSS sync never finds anything on it. A
+                    // periodic search for monitored books without a file is the only way those
+                    // get grabbed without the user pressing a button.
+                    new ScheduledTask
+                    {
+                        Interval = GetMissingBookSearchInterval(),
+                        TypeName = typeof(MissingBookSearchCommand).FullName,
+                        Priority = CommandPriority.Low
                     }
                 };
 
@@ -187,6 +198,18 @@ namespace NzbDrone.Core.Jobs
             return interval;
         }
 
+        private int GetMissingBookSearchInterval()
+        {
+            var interval = _configService.MissingBookSearchInterval;
+
+            if (interval < 0)
+            {
+                return 0;
+            }
+
+            return interval * 60;
+        }
+
         public void Handle(CommandExecutedEvent message)
         {
             var scheduledTask = _scheduledTaskRepository.All().SingleOrDefault(c => c.TypeName == message.Command.Body.GetType().FullName);
@@ -215,10 +238,14 @@ namespace NzbDrone.Core.Jobs
             var backup = _scheduledTaskRepository.GetDefinition(typeof(BackupCommand));
             backup.Interval = GetBackupInterval();
 
-            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup });
+            var missingSearch = _scheduledTaskRepository.GetDefinition(typeof(MissingBookSearchCommand));
+            missingSearch.Interval = GetMissingBookSearchInterval();
+
+            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup, missingSearch });
 
             _cache.Find(rss.TypeName).Interval = rss.Interval;
             _cache.Find(backup.TypeName).Interval = backup.Interval;
+            _cache.Find(missingSearch.TypeName).Interval = missingSearch.Interval;
         }
     }
 }

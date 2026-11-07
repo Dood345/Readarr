@@ -1,5 +1,4 @@
 using NLog;
-using NzbDrone.Core.Indexers;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Profiles.Delay;
@@ -25,16 +24,12 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
         {
             var delayProfile = _delayProfileService.BestForTags(subject.Author.Tags);
 
-            if (subject.Release.DownloadProtocol == DownloadProtocol.Usenet && !delayProfile.EnableUsenet)
-            {
-                _logger.Debug("[{0}] Usenet is not enabled for this author", subject.Release.Title);
-                return Decision.Reject("Usenet is not enabled for this author");
-            }
+            var protocol = subject.Release.DownloadProtocol;
 
-            if (subject.Release.DownloadProtocol == DownloadProtocol.Torrent && !delayProfile.EnableTorrent)
+            if (!delayProfile.IsAllowedProtocol(protocol))
             {
-                _logger.Debug("[{0}] Torrent is not enabled for this author", subject.Release.Title);
-                return Decision.Reject("Torrent is not enabled for this author");
+                _logger.Debug("[{0}] {1} is not enabled for this author", subject.Release.Title, protocol);
+                return Decision.Reject("{0} is not enabled for this author", protocol);
             }
 
             return Decision.Accept();

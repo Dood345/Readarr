@@ -18,6 +18,7 @@ namespace Readarr.Api.V1.Config
                 Id = model.Id,
 
                 RenameBooks = model.RenameBooks,
+                KeepPartFileNames = model.KeepPartFileNames,
                 ReplaceIllegalCharacters = model.ReplaceIllegalCharacters,
                 ColonReplacementFormat = (int)model.ColonReplacementFormat,
                 StandardBookFormat = model.StandardBookFormat,
@@ -42,6 +43,7 @@ namespace Readarr.Api.V1.Config
                 Id = resource.Id,
 
                 RenameBooks = resource.RenameBooks,
+                KeepPartFileNames = resource.KeepPartFileNames,
                 ReplaceIllegalCharacters = resource.ReplaceIllegalCharacters,
                 ColonReplacementFormat = (ColonReplacementFormat)resource.ColonReplacementFormat,
                 StandardBookFormat = resource.StandardBookFormat,

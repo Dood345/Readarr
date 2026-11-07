@@ -90,7 +90,7 @@ namespace NzbDrone.Core.Download
             return GetType().Name;
         }
 
-        public abstract DownloadProtocol Protocol { get; }
+        public abstract string Protocol { get; }
 
         public abstract Task<string> Download(RemoteBook remoteBook, IIndexer indexer);
         public abstract IEnumerable<DownloadClientItem> GetItems();

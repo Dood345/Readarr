@@ -1,6 +1,7 @@
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Cache;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
@@ -28,13 +29,12 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
 
         public virtual Decision IsSatisfiedBy(RemoteBook subject, SearchCriteriaBase searchCriteria)
         {
-            foreach (var file in subject.Books.SelectMany(c => c.BookFiles.Value))
-            {
-                if (file == null)
-                {
-                    return Decision.Accept();
-                }
+            // Only files of the same media type compete: an audiobook release is never held back
+            // by an existing epub, nor an ebook by an existing m4b.
+            var mediaType = subject.ParsedBookInfo.Quality.Quality.MediaType();
 
+            foreach (var file in subject.Books.SelectMany(c => c.BookFiles.Value.OfMediaType(mediaType)))
+            {
                 var customFormats = _formatService.ParseCustomFormat(file);
 
                 if (!_upgradableSpecification.IsUpgradable(subject.Author.QualityProfile,

@@ -9,6 +9,7 @@ using NzbDrone.Core.Configuration.Events;
 using NzbDrone.Core.Languages;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Messaging.Events;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Security;
 
@@ -107,6 +108,13 @@ namespace NzbDrone.Core.Configuration
             get { return GetValueInt("RssSyncInterval", 15); }
 
             set { SetValue("RssSyncInterval", value); }
+        }
+
+        public int MissingBookSearchInterval
+        {
+            get { return GetValueInt("MissingBookSearchInterval", 24); }
+
+            set { SetValue("MissingBookSearchInterval", value); }
         }
 
         public int MaximumSize
@@ -262,11 +270,11 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("ChownGroup", value); }
         }
 
-        public string MetadataSource
+        public MetadataProviderType MetadataProvider
         {
-            get { return GetValue("MetadataSource", ""); }
+            get { return GetValueEnum("MetadataProvider", MetadataProviderType.OpenLibrary); }
 
-            set { SetValue("MetadataSource", value); }
+            set { SetValue("MetadataProvider", value); }
         }
 
         public WriteAudioTagsType WriteAudioTags

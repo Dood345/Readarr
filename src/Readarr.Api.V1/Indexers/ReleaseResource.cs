@@ -48,7 +48,7 @@ namespace Readarr.Api.V1.Indexers
         public string InfoHash { get; set; }
         public int? Seeders { get; set; }
         public int? Leechers { get; set; }
-        public DownloadProtocol Protocol { get; set; }
+        public string Protocol { get; set; }
         public int IndexerFlags { get; set; }
 
         // Sent when queuing an unknown release
@@ -121,7 +121,7 @@ namespace Readarr.Api.V1.Indexers
         {
             ReleaseInfo model;
 
-            if (resource.Protocol == DownloadProtocol.Torrent)
+            if (resource.Protocol == nameof(TorrentDownloadProtocol))
             {
                 model = new TorrentInfo
                 {

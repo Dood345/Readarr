@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using NzbDrone.Core.Books;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.Download.TrackedDownloads;
-using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
 
@@ -25,7 +24,7 @@ namespace NzbDrone.Core.Queue
         public List<TrackedDownloadStatusMessage> StatusMessages { get; set; }
         public string DownloadId { get; set; }
         public RemoteBook RemoteBook { get; set; }
-        public DownloadProtocol Protocol { get; set; }
+        public string Protocol { get; set; }
         public string DownloadClient { get; set; }
         public bool DownloadClientHasPostImportCategory { get; set; }
         public string Indexer { get; set; }

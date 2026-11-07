@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Profiles.Qualities;
@@ -96,7 +97,9 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
 
         public bool QualityCutoffNotMet(QualityProfile profile, QualityModel currentQuality, QualityModel newQuality = null)
         {
-            var cutoff = profile.UpgradeAllowed ? profile.Cutoff : profile.FirstAllowedQuality().Id;
+            // The cutoff is resolved per media type: an audiobook is measured against the audio
+            // cutoff and an ebook against the text one, never across the two.
+            var cutoff = profile.EffectiveCutoffFor(currentQuality.Quality.MediaType());
             var cutoffCompare = new QualityModelComparer(profile).Compare(currentQuality.Quality.Id, cutoff);
 
             if (cutoffCompare < 0)

@@ -31,6 +31,24 @@ namespace NzbDrone.Core.Profiles.Metadata
         public const string NONE_PROFILE_NAME = "None";
         public const double NONE_PROFILE_MIN_POPULARITY = 1e10;
 
+        // Popularity is Ratings.Votes * Ratings.Value, which only works if the metadata source
+        // reports ratings consistently. Open Library does not: "Dune" carries 160 editions and
+        // *zero* ratings, as does "Dune Messiah", while "Children of Dune" has 47. Any threshold
+        // above zero silently removes the most famous books in a bibliography and leaves the
+        // sequels, which is exactly what happened here.
+        //
+        // Duplicate and omnibus records - the noise this filter was really guarding against - are
+        // removed by the provider instead, where edition counts make that judgement reliably.
+        public const double DEFAULT_MIN_POPULARITY = 0;
+
+        // Open Library records merchandise and study aids as works alongside the books themselves:
+        // "Dune Coloring Book", "Dune Calendar 1978", "DUNE : the Graphic Novel", box sets and
+        // SparkNotes guides. They are not just clutter - they win identification matches against
+        // real files, so "Dune 1 - Dune" resolved to the graphic novel. Users can edit this list.
+        public const string DEFAULT_IGNORED_TERMS =
+            "graphic novel,coloring book,colouring book,calendar,sparknotes,study guide," +
+            "boxed set,box set,complete series,omnibus,movie tie-in";
+
         private static readonly Regex PartOrSetRegex = new Regex(@"(?<from>\d+) of (?<to>\d+)|(?<from>\d+)\s?/\s?(?<to>\d+)|(?<from>\d+)\s?-\s?(?<to>\d+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -282,9 +300,10 @@ namespace NzbDrone.Core.Profiles.Metadata
                 Add(new MetadataProfile
                 {
                     Name = "Standard",
-                    MinPopularity = 350,
+                    MinPopularity = DEFAULT_MIN_POPULARITY,
                     SkipMissingDate = true,
                     SkipPartsAndSets = true,
+                    Ignored = DEFAULT_IGNORED_TERMS.Split(',').ToList(),
                     AllowedLanguages = "eng, null"
                 });
             }

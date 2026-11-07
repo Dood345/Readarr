@@ -93,11 +93,29 @@ namespace NzbDrone.Core.Books
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// Monitors this edition and unmonitors the others *of the same media type*. A book may
+        /// monitor one ebook edition and one audiobook edition at the same time, so choosing an
+        /// audiobook must not silently drop the ebook that is already being tracked.
+        /// </summary>
         public List<Edition> SetMonitored(Edition edition)
         {
             var allEditions = FindByBook(new[] { edition.BookId });
-            allEditions.ForEach(r => r.Monitored = r.Id == edition.Id);
-            Ensure.That(allEditions.Count(x => x.Monitored) == 1).IsTrue();
+            var mediaType = edition.MediaType();
+
+            foreach (var other in allEditions)
+            {
+                if (other.Id == edition.Id)
+                {
+                    other.Monitored = true;
+                }
+                else if (other.MediaType() == mediaType)
+                {
+                    other.Monitored = false;
+                }
+            }
+
+            Ensure.That(allEditions.Count(x => x.Monitored && x.MediaType() == mediaType) == 1).IsTrue();
             UpdateMany(allEditions);
             return allEditions;
         }

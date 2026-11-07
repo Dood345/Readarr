@@ -11,3 +11,10 @@
   border-color: var(--usenetColor);
   background-color: var(--usenetColor);
 }
+
+.soulseek {
+  composes: label from '~Components/Label.css';
+
+  border-color: var(--soulseekColor);
+  background-color: var(--soulseekColor);
+}

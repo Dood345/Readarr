@@ -29,6 +29,8 @@ namespace NzbDrone.Core.Profiles.Qualities
                                          IHandle<CustomFormatAddedEvent>,
                                          IHandle<CustomFormatDeletedEvent>
     {
+        public const string EbookAndAudiobookProfileName = "eBook + Audiobook";
+
         private readonly IProfileRepository _profileRepository;
         private readonly IAuthorService _authorService;
         private readonly IImportListFactory _importListFactory;
@@ -110,6 +112,17 @@ namespace NzbDrone.Core.Profiles.Qualities
                               Quality.MP3,
                               Quality.M4B,
                               Quality.FLAC);
+
+            // A book may track an ebook and an audiobook at once, and quality comparisons stay
+            // within a media type, so one profile can want both without either blocking the other.
+            // Cut off at M4B; the text side then upgrades as far as AZW3 (see QualityProfile.CutoffFor).
+            AddDefaultProfile(EbookAndAudiobookProfileName,
+                              Quality.M4B,
+                              Quality.MOBI,
+                              Quality.EPUB,
+                              Quality.AZW3,
+                              Quality.MP3,
+                              Quality.M4B);
         }
 
         public void Handle(CustomFormatAddedEvent message)

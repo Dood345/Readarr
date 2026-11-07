@@ -116,6 +116,14 @@ namespace NzbDrone.Core.Organizer
                 }
             }
 
+            // The last component is the file name. A multi-part book keeps its original one when
+            // asked to, so "H01-02 Chapter01 An Unexpected Party 1.mp3" is not reduced to
+            // "The Hobbit (2).mp3" - the folder still follows the format.
+            if (namingConfig.KeepPartFileNames && bookFile.PartCount > 1 && components.Any())
+            {
+                components[components.Count - 1] = CleanFileName(GetOriginalFileName(bookFile), namingConfig);
+            }
+
             return Path.Combine(components.ToArray());
         }
 
@@ -254,6 +262,14 @@ namespace NzbDrone.Core.Organizer
             tokenHandlers["{Book Title}"] = m => edition.Title;
             tokenHandlers["{Book CleanTitle}"] = m => CleanTitle(edition.Title);
             tokenHandlers["{Book TitleThe}"] = m => TitleThe(edition.Title);
+
+            // The work's own title, shared by every edition of the book. Edition titles differ
+            // between an ebook and its audiobook, so these are what keep both in one folder.
+            var workTitle = edition.Book.Value.Title.IsNotNullOrWhiteSpace() ? edition.Book.Value.Title : edition.Title;
+
+            tokenHandlers["{Work Title}"] = m => workTitle;
+            tokenHandlers["{Work CleanTitle}"] = m => CleanTitle(workTitle);
+            tokenHandlers["{Work TitleThe}"] = m => TitleThe(workTitle);
 
             var (titleNoSub, subtitle) = edition.Title.SplitBookTitle(edition.Book.Value.AuthorMetadata.Value.Name);
 

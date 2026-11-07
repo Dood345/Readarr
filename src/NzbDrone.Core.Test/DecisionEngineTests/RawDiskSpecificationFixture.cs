@@ -18,7 +18,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         {
             _remoteBook = new RemoteBook
             {
-                Release = new ReleaseInfo() { DownloadProtocol = DownloadProtocol.Torrent }
+                Release = new ReleaseInfo() { DownloadProtocol = nameof(TorrentDownloadProtocol) }
             };
         }
 

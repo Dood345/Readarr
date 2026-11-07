@@ -73,6 +73,12 @@ const bookTokens = [
 
   { token: '{Book CleanTitleNoSub}', example: 'The Books Title!' },
 
+  { token: '{Work Title}', example: 'The Book\'s Title!' },
+
+  { token: '{Work TitleThe}', example: 'Book\'s Title!, The' },
+
+  { token: '{Work CleanTitle}', example: 'The Books Title!' },
+
   { token: '{Book Subtitle}', example: 'Subtitle!' },
 
   { token: '{Book SubtitleThe}', example: 'Subtitle!, The' },

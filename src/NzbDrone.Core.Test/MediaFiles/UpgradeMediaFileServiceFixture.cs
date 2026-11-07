@@ -9,6 +9,7 @@ using NzbDrone.Core.Books;
 using NzbDrone.Core.Datastore;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Qualities;
 using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
@@ -64,6 +65,60 @@ namespace NzbDrone.Core.Test.MediaFiles
                               }
                           }))
                 .Build();
+        }
+
+        private void GivenBookWithFileOfQuality(Quality quality)
+        {
+            _localTrack.Book = Builder<Book>.CreateNew()
+                .With(e => e.BookFiles = new LazyLoaded<List<BookFile>>(
+                          new List<BookFile>
+                          {
+                              new BookFile
+                              {
+                                  Id = 1,
+                                  Path = Path.Combine(_rootPath, @"Book\existing.file"),
+                                  Quality = new QualityModel(quality)
+                              }
+                          }))
+                .Build();
+        }
+
+        [Test]
+        public void should_not_delete_an_ebook_when_an_audiobook_arrives()
+        {
+            // The two coexist: an m4b landing on a book that already has an epub must leave it be.
+            GivenBookWithFileOfQuality(Quality.EPUB);
+            _trackFile.Quality = new QualityModel(Quality.M4B);
+
+            var result = Subject.UpgradeBookFile(_trackFile, _localTrack);
+
+            result.OldFiles.Should().BeEmpty();
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMediaFileService>().Verify(v => v.Delete(It.IsAny<BookFile>(), DeleteMediaFileReason.Upgrade), Times.Never());
+        }
+
+        [Test]
+        public void should_not_delete_an_audiobook_when_an_ebook_arrives()
+        {
+            GivenBookWithFileOfQuality(Quality.M4B);
+            _trackFile.Quality = new QualityModel(Quality.EPUB);
+
+            var result = Subject.UpgradeBookFile(_trackFile, _localTrack);
+
+            result.OldFiles.Should().BeEmpty();
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+        }
+
+        [Test]
+        public void should_replace_an_existing_file_of_the_same_media_type()
+        {
+            GivenBookWithFileOfQuality(Quality.MP3);
+            _trackFile.Quality = new QualityModel(Quality.M4B);
+
+            var result = Subject.UpgradeBookFile(_trackFile, _localTrack);
+
+            result.OldFiles.Should().HaveCount(1);
+            Mocker.GetMock<IRecycleBinProvider>().Verify(v => v.DeleteFile(It.IsAny<string>(), It.IsAny<string>()), Times.Once());
         }
 
         [Test]

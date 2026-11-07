@@ -28,16 +28,27 @@ namespace NzbDrone.Core.Books
             var qualitiesBelowCutoff = new List<QualitiesBelowCutoff>();
             var profiles = _qualityProfileService.All();
 
-            //Get all items less than the cutoff
+            // Get all items less than the cutoff. The cutoff is resolved per media type, so an
+            // ebook is only "below cutoff" against the text qualities and an audiobook against the
+            // audio ones; otherwise every epub in a profile cut off at M4B would be wanted forever.
             foreach (var profile in profiles)
             {
-                var cutoff = profile.UpgradeAllowed ? profile.Cutoff : profile.FirstAllowedQuality().Id;
-                var cutoffIndex = profile.GetIndex(cutoff);
-                var belowCutoff = profile.Items.Take(cutoffIndex.Index).ToList();
+                var belowCutoff = new List<int>();
+
+                foreach (var mediaType in new[] { BookMediaType.Ebook, BookMediaType.Audiobook })
+                {
+                    var cutoffIndex = profile.GetIndex(profile.EffectiveCutoffFor(mediaType));
+
+                    belowCutoff.AddRange(profile.Items
+                        .Take(cutoffIndex.Index)
+                        .SelectMany(i => i.GetQualities())
+                        .Where(q => q.MediaType() == mediaType)
+                        .Select(q => q.Id));
+                }
 
                 if (belowCutoff.Any())
                 {
-                    qualitiesBelowCutoff.Add(new QualitiesBelowCutoff(profile.Id, belowCutoff.SelectMany(i => i.GetQualities().Select(q => q.Id))));
+                    qualitiesBelowCutoff.Add(new QualitiesBelowCutoff(profile.Id, belowCutoff.Distinct()));
                 }
             }
 

@@ -20,7 +20,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         {
             _remoteBook = new RemoteBook
             {
-                Release = new ReleaseInfo() { DownloadProtocol = DownloadProtocol.Usenet }
+                Release = new ReleaseInfo() { DownloadProtocol = nameof(UsenetDownloadProtocol) }
             };
         }
 
@@ -82,7 +82,7 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
         [Test]
         public void should_return_true_when_release_is_not_usenet()
         {
-            _remoteBook.Release.DownloadProtocol = DownloadProtocol.Torrent;
+            _remoteBook.Release.DownloadProtocol = nameof(TorrentDownloadProtocol);
 
             WithRetention(10);
             WithAge(100);

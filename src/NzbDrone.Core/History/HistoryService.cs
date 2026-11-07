@@ -160,7 +160,7 @@ namespace NzbDrone.Core.History
                 history.Data.Add("Size", message.Book.Release.Size.ToString());
                 history.Data.Add("DownloadUrl", message.Book.Release.DownloadUrl);
                 history.Data.Add("Guid", message.Book.Release.Guid);
-                history.Data.Add("Protocol", ((int)message.Book.Release.DownloadProtocol).ToString());
+                history.Data.Add("Protocol", message.Book.Release.DownloadProtocol);
                 history.Data.Add("DownloadForced", (!message.Book.DownloadAllowed).ToString());
                 history.Data.Add("CustomFormatScore", message.Book.CustomFormatScore.ToString());
                 history.Data.Add("ReleaseSource", message.Book.ReleaseSource.ToString());

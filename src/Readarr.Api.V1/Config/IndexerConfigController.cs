@@ -22,6 +22,9 @@ namespace Readarr.Api.V1.Config
 
             SharedValidator.RuleFor(c => c.RssSyncInterval)
                            .IsValidRssSyncInterval();
+
+            SharedValidator.RuleFor(c => c.MissingBookSearchInterval)
+                           .GreaterThanOrEqualTo(0);
         }
 
         protected override IndexerConfigResource ToResource(IConfigService model)

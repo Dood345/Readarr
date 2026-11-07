@@ -4,7 +4,6 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Xml.XPath;
 using NzbDrone.Common.Http;
-using NzbDrone.Core.MetadataSource.BookInfo;
 
 namespace NzbDrone.Core.MetadataSource.Goodreads
 {
@@ -110,7 +109,7 @@ namespace NzbDrone.Core.MetadataSource.Goodreads
             // If we found any error at all above, throw an exception
             if (!string.IsNullOrWhiteSpace(error))
             {
-                throw new BookInfoException("Received an error from Goodreads " + error);
+                throw new GoodreadsException("Received an error from Goodreads " + error);
             }
         }
     }

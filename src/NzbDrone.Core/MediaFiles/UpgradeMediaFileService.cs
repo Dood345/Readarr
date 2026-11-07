@@ -2,6 +2,7 @@ using System.Linq;
 using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.Books.Calibre;
 using NzbDrone.Core.MediaFiles.BookImport;
 using NzbDrone.Core.Parser.Model;
@@ -47,7 +48,10 @@ namespace NzbDrone.Core.MediaFiles
         public BookFileMoveResult UpgradeBookFile(BookFile bookFile, LocalBook localBook, bool copyOnly = false)
         {
             var moveFileResult = new BookFileMoveResult();
-            var existingFiles = localBook.Book.BookFiles.Value;
+
+            // A book may hold an ebook and an audiobook side by side. Replacing one must never
+            // delete the other, so only files of the incoming file's media type are upgraded.
+            var existingFiles = localBook.Book.BookFiles.Value.OfMediaType(bookFile.MediaType());
 
             var rootFolderPath = _diskProvider.GetParentFolder(localBook.Author.Path);
             var rootFolder = _rootFolderService.GetBestRootFolder(rootFolderPath);

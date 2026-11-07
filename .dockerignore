@@ -1,0 +1,12 @@
+.git
+.github
+_output
+_tests
+_temp
+_artifacts
+node_modules
+frontend/**/node_modules
+*.user
+*.suo
+.vs
+.idea
