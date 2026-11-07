@@ -135,6 +135,15 @@ namespace NzbDrone.Core.Jobs
                         Interval = GetMissingBookSearchInterval(),
                         TypeName = typeof(MissingBookSearchCommand).FullName,
                         Priority = CommandPriority.Low
+                    },
+
+                    // Same reason: upgrades (a quality or custom-format score below the profile's
+                    // cutoff) are only ever found on Soulseek by searching for them.
+                    new ScheduledTask
+                    {
+                        Interval = GetMissingBookSearchInterval(),
+                        TypeName = typeof(CutoffUnmetBookSearchCommand).FullName,
+                        Priority = CommandPriority.Low
                     }
                 };
 
@@ -241,11 +250,15 @@ namespace NzbDrone.Core.Jobs
             var missingSearch = _scheduledTaskRepository.GetDefinition(typeof(MissingBookSearchCommand));
             missingSearch.Interval = GetMissingBookSearchInterval();
 
-            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup, missingSearch });
+            var cutoffSearch = _scheduledTaskRepository.GetDefinition(typeof(CutoffUnmetBookSearchCommand));
+            cutoffSearch.Interval = GetMissingBookSearchInterval();
+
+            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, backup, missingSearch, cutoffSearch });
 
             _cache.Find(rss.TypeName).Interval = rss.Interval;
             _cache.Find(backup.TypeName).Interval = backup.Interval;
             _cache.Find(missingSearch.TypeName).Interval = missingSearch.Interval;
+            _cache.Find(cutoffSearch.TypeName).Interval = cutoffSearch.Interval;
         }
     }
 }

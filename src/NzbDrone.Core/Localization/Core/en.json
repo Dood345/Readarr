@@ -608,7 +608,7 @@
   "MissingBooksAuthorMonitored": "Missing Books (Author monitored)",
   "MissingBooksAuthorNotMonitored": "Missing Books (Author not monitored)",
   "MissingBookSearchInterval": "Missing Book Search Interval",
-  "MissingBookSearchIntervalHelpText": "Interval in hours between automatic searches for monitored books that have no file. Set to zero to disable. Soulseek has no RSS feed, so this is the only way releases on it are found automatically",
+  "MissingBookSearchIntervalHelpText": "Interval in hours between automatic searches for monitored books that have no file, and for files below their profile's quality or custom format cutoff. Set to zero to disable. Soulseek has no RSS feed, so this is the only way releases on it are found automatically",
   "MissingFromDisk": "Readarr was unable to find the file on disk so the file was unlinked from the book in the database",
   "Mode": "Mode",
   "Monitor": "Monitor",
