@@ -25,6 +25,11 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 return title;
             }
 
+            // Typographic apostrophes and quotes become the plain ones. Titles name files, and the
+            // same book arrives as "Carl's" from one source and "Carl’s" from another, which would
+            // otherwise have the renamer shuffling folders between the two spellings.
+            title = title.Replace('’', '\'').Replace('‘', '\'').Replace('“', '"').Replace('”', '"');
+
             var words = title.Split(' ');
             var changed = false;
 
@@ -49,6 +54,15 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             }
 
             return changed ? string.Join(" ", words) : title;
+        }
+
+        /// <summary>
+        /// Plain apostrophes and quotes only; applied to edition titles too, so an edition and its
+        /// work never differ by typography alone.
+        /// </summary>
+        public static string PlainQuotes(string title)
+        {
+            return title?.Replace('’', '\'').Replace('‘', '\'').Replace('“', '"').Replace('”', '"');
         }
 
         private static bool EndsClause(string previous)

@@ -17,6 +17,8 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         [TestCase("Dune: the butlerian jihad", "Dune: The Butlerian Jihad")]
         [TestCase("Dune : Red Plague", "Dune : Red Plague")]
         [TestCase("Dune Messiah", "Dune Messiah")]
+        [TestCase("Carl’s Doomsday Scenario", "Carl's Doomsday Scenario")]
+        [TestCase("the dungeon anarchist’s cookbook", "The Dungeon Anarchist's Cookbook")]
         [TestCase("DUNE", "DUNE")]
         [TestCase("", "")]
         [TestCase(null, null)]

@@ -17,7 +17,8 @@ namespace NzbDrone.Core.MetadataSource.Audible
     /// </summary>
     public class AudibleTitleMatcher
     {
-        private const int WholeTitle = 3;
+        private const int WholeTitle = 4;
+        private const int SegmentAgainstWhole = 3;
         private const int SegmentMatch = 2;
         private const int HeadOnly = 1;
 
@@ -84,7 +85,15 @@ namespace NzbDrone.Core.MetadataSource.Audible
             var productTail = product.Segments.Skip(1).ToList();
             var workTail = work.Segments.Skip(1).ToList();
 
-            if (productTail.Contains(work.Whole) || workTail.Contains(product.Whole) || productTail.Intersect(workTail).Any())
+            // A segment equal to the other side's whole title outranks two tails merely sharing a
+            // segment, so "Dune: The Butlerian Jihad" goes to the work "The Butlerian Jihad" rather
+            // than to "Dune: The Butlerian Jihad: Book One of the Legends of Dune Trilogy".
+            if (productTail.Contains(work.Whole) || workTail.Contains(product.Whole))
+            {
+                return SegmentAgainstWhole;
+            }
+
+            if (productTail.Intersect(workTail).Any())
             {
                 return SegmentMatch;
             }

@@ -206,8 +206,17 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 _logger.Debug($"Trying Release {release}");
                 var rwatch = System.Diagnostics.Stopwatch.StartNew();
 
+                // A candidate's existing files join the comparison, but only those in the same
+                // folder as the files being identified: a book's files live together. During a
+                // full rescan every file on disk is "extra", and an edition holding 22 chapter
+                // files in another folder would otherwise outvote a single stray m4b's own tags
+                // and absorb it - which is how The Butlerian Jihad ended up on The Battle of Corrin.
+                var folders = localBookRelease.LocalBooks.Select(x => x.Path.GetParentPath()).Distinct().ToList();
                 var extraTrackPaths = candidateRelease.ExistingFiles.Select(x => x.Path).ToList();
-                var extraTracks = extraTracksOnDisk.Where(x => extraTrackPaths.Contains(x.Path)).ToList();
+                var extraTracks = extraTracksOnDisk
+                    .Where(x => extraTrackPaths.Contains(x.Path))
+                    .Where(x => folders.Any(f => f.PathEquals(x.Path.GetParentPath())))
+                    .ToList();
                 var allLocalTracks = localBookRelease.LocalBooks.Concat(extraTracks).DistinctBy(x => x.Path).ToList();
 
                 var distance = DistanceCalculator.BookDistance(allLocalTracks, release);

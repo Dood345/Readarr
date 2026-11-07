@@ -85,6 +85,17 @@ namespace NzbDrone.Core.Test.MetadataSource.Audible
         }
 
         [Test]
+        public void should_prefer_the_work_whose_whole_title_is_a_segment_of_the_product()
+        {
+            var matcher = new AudibleTitleMatcher(
+                new[] { Product("Dune: The Butlerian Jihad") },
+                new[] { "Dune: The Butlerian Jihad: Book One of the Legends of Dune Trilogy", "The Butlerian Jihad" });
+
+            Titles(matcher, "The Butlerian Jihad").Should().HaveCount(1);
+            Titles(matcher, "Dune: The Butlerian Jihad: Book One of the Legends of Dune Trilogy").Should().BeEmpty();
+        }
+
+        [Test]
         public void should_return_nothing_for_an_unknown_work()
         {
             var matcher = new AudibleTitleMatcher(new[] { Product("Dune") }, new[] { "Dune" });
