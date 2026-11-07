@@ -5,9 +5,12 @@ namespace NzbDrone.Core.Organizer
 {
     public class NamingConfig : ModelBase
     {
+        // Renaming is on by default because the book folder only exists inside StandardBookFormat:
+        // with it off every import lands loose in the author folder, and Audiobookshelf then shows
+        // an author's whole catalogue as one book.
         public static NamingConfig Default => new NamingConfig
         {
-            RenameBooks = false,
+            RenameBooks = true,
             ReplaceIllegalCharacters = true,
             ColonReplacementFormat = ColonReplacementFormat.Smart,
             StandardBookFormat = "{Book Title}" + Path.DirectorySeparatorChar + "{Author Name} - {Book Title}{ (PartNumber)}",
