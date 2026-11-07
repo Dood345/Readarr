@@ -158,8 +158,9 @@ and behave exactly as in Lidarr:
 - **Data**: Dapper over SQLite (default) **or** Postgres — both must keep working.
   `BasicRepository<TModel>`, `TableMapping.cs`, `WhereBuilderSqlite`/`WhereBuilderPostgres`.
   Migrations are FluentMigrator in `src/NzbDrone.Core/Datastore/Migration/`, `NNN_snake_case.cs`
-  with `[Migration(NNN)]`. Highest is **044** (043 turns renaming on, 044 seeds the
-  "eBook + Audiobook" profile). Always add the next number;
+  with `[Migration(NNN)]`. Highest is **045** (043 turns renaming on, 044 seeds the
+  "eBook + Audiobook" profile, 045 moves the default format to `{Work Title}` and adds
+  `KeepPartFileNames`). Always add the next number;
   never edit an existing migration.
 - **Providers (ThingiProvider)**: indexers, download clients, notifications, import lists and
   metadata consumers are all `IProvider` + `IProviderConfig` + `ProviderDefinition`, discovered by
@@ -217,7 +218,18 @@ the other format again (History reason `Upgrade`, 2026-10-30, is what that looke
 
 `NamingConfig.Default.RenameBooks` is `true`: the book folder only exists inside
 `StandardBookFormat`, so with renaming off every import lands loose in the author folder and
-Audiobookshelf merges an author's catalogue into one item.
+Audiobookshelf merges an author's catalogue into one item. The default format uses
+**`{Work Title}`** (the book's title) rather than `{Book Title}` (the *edition's* title) so an epub
+and its audiobook share one folder; `KeepPartFileNames` leaves chapter-per-file rips with their
+original file names, because untagged rips carry chapter names nowhere else.
+
+Identification: `DistanceCalculator` adds a `media_type` penalty (weight 1.0, below the title's 3.0)
+so an m4b lands on the audiobook edition and an epub on the text edition when the book has both.
+Audible products are assigned to works by `AudibleTitleMatcher` — one product, one work, whole title
+first — because keying on the title before the colon filed every "Dune: X" audiobook under "Dune".
+`TitleCasing.Normalize` fixes Open Library's "House atreides" style work titles before they name
+folders. Dedup in `OpenLibraryProvider.DeduplicateWorks` also merges series-prefixed and subtitled
+variants ("Dune: The Butlerian Jihad" ≡ "The Butlerian Jihad" ≡ "Dune Butlerian Jihad").
 
 Soulseek has no RSS. `MissingBookSearchCommand` is on the scheduler (`MissingBookSearchInterval`,
 hours, Settings → Indexers) because nothing on slskd is ever found otherwise.

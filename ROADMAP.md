@@ -241,6 +241,25 @@ in the session notes):
   NU1901–NU1904 audit codes as warnings. A free OSS key from sixlabors.com would allow the bump.
   The Lidarr fork pins the same version and has the same problem.
 
+Round 2, after inventorying the real library against Readarr's data (all 1,772 media files were
+in Readarr, but a dozen sat on the wrong book or edition):
+
+- Identification scored an m4b identically against a book's ebook and audiobook editions, so audio
+  files were filed under the text edition and the audiobook edition stayed "missing" (and would
+  have been re-downloaded by the scheduled search). `DistanceCalculator` now adds a `media_type`
+  tie-break.
+- Audible products were matched on the title before the colon, so every "Dune: X" audiobook
+  reduced to "dune": *Battle of Corrin* landed on the work "Dune: Red Plague" and the work "Dune"
+  collected the whole series as editions. `AudibleTitleMatcher` assigns each product to one work.
+- Dedup missed "The Butlerian Jihad" / "Dune: The Butlerian Jihad: Book One…" / "Dune Butlerian
+  Jihad", so the epub and the m4b of one book sat on different works.
+- `{Book Title}` is the edition title; the audiobook edition's Audible title differs from the
+  ebook's, so a rename would have split one book over two folders. New `{Work Title}` tokens and
+  default; migration 045 updates an install still on the old default. OL work titles are
+  title-cased ("House atreides" → "House Atreides") since they now name folders.
+- Renaming a 1,310-file untagged Tolkien rip to "The Hobbit (2).mp3" would have lost every chapter
+  name in Audiobookshelf. `KeepPartFileNames` (default on) keeps multi-part file names.
+
 Still open: the `Slskd` download client adopts every finished slskd folder (hardcoded
 `Category = "Readarr"`), including Lidarr/soularr music — 300+ failed import attempts in
 `DownloadHistory`. Download ids use `string.GetHashCode()`, which changes per process on .NET, so
