@@ -386,7 +386,8 @@ namespace NzbDrone.Core.Parser
                 {
                     AuthorName = foundAuthor,
                     AuthorTitleInfo = GetAuthorTitleInfo(foundAuthor),
-                    BookTitle = foundBook
+                    BookTitle = foundBook,
+                    ReleaseTitle = releaseTitle
                 };
 
                 try

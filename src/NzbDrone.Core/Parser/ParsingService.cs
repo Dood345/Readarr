@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
@@ -26,20 +28,32 @@ namespace NzbDrone.Core.Parser
 
     public class ParsingService : IParsingService
     {
+        // "Dominion of Blades, Book 2", "Dominion of Blades: Vol. 2", "Dominion of Blades #2"
+        private const string SeriesPositionSuffix = @"\s*(?:[,:#\-–—]\s*(?:book|bk|vol|volume|part|no)?|(?:book|bk|vol|volume|part|no))\.?\s*#?\s*0*(?<position>\d+(?:\.\d+)?)\b";
+
+        // "Vol 1 - Dominion of Blades", "01 Dominion of Blades", "Book 1: Dominion of Blades"
+        private const string SeriesPositionPrefix = @"(?<![\w.])(?:(?:book|bk|vol|volume|part|no)\.?\s*)?#?0*(?<position>\d+(?:\.\d+)?)\s*[-:.,–—]?\s*";
+
+        // "2 Dominion of Blades Books" is a bundle, not book 2
+        private const string NotABundle = @"\b(?!\s*(?:books|novels|audiobooks|ebooks|series|collection|set|bundle|boxset)\b)";
+
         private readonly IAuthorService _authorService;
         private readonly IBookService _bookService;
         private readonly IEditionService _editionService;
+        private readonly ISeriesService _seriesService;
         private readonly IMediaFileService _mediaFileService;
         private readonly Logger _logger;
 
         public ParsingService(IAuthorService authorService,
                               IBookService bookService,
                               IEditionService editionService,
+                              ISeriesService seriesService,
                               IMediaFileService mediaFileService,
                               Logger logger)
         {
             _bookService = bookService;
             _editionService = editionService;
+            _seriesService = seriesService;
             _authorService = authorService;
             _mediaFileService = mediaFileService;
             _logger = logger;
@@ -118,7 +132,11 @@ namespace NzbDrone.Core.Parser
                 return _bookService.GetBooksByAuthor(author.Id);
             }
 
-            if (searchCriteria != null)
+            // A release that names a series position ("The Hobgoblin Riot: Dominion of Blades, Book 2") is that
+            // book, even when the searched book's title ("Dominion of Blades") also appears in it as the series name.
+            bookInfo = FindBySeriesPosition(author, parsedBookInfo);
+
+            if (bookInfo == null && searchCriteria != null)
             {
                 var cleanTitle = Parser.CleanAuthorName(parsedBookInfo.BookTitle);
                 bookInfo = searchCriteria.Books.ExclusiveOrDefault(e => e.Title == bookTitle || e.CleanTitle == cleanTitle);
@@ -159,6 +177,64 @@ namespace NzbDrone.Core.Parser
             }
 
             return result;
+        }
+
+        private Book FindBySeriesPosition(Author author, ParsedBookInfo parsedBookInfo)
+        {
+            var title = parsedBookInfo.ReleaseTitle.IsNotNullOrWhiteSpace() ? parsedBookInfo.ReleaseTitle : parsedBookInfo.BookTitle;
+
+            if (title.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            var series = _seriesService.GetByAuthorMetadataId(author.AuthorMetadataId)?
+                .Where(s => s.Title.IsNotNullOrWhiteSpace())
+                .OrderByDescending(s => s.Title.Length)
+                .ToList();
+
+            if (series == null || series.Empty())
+            {
+                return null;
+            }
+
+            List<Book> authorBooks = null;
+
+            foreach (var s in series)
+            {
+                var seriesPattern = string.Join(@"\W+", s.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape));
+                var match = Regex.Match(title, @"\b" + seriesPattern + SeriesPositionSuffix, RegexOptions.IgnoreCase);
+
+                if (!match.Success)
+                {
+                    match = Regex.Match(title, SeriesPositionPrefix + seriesPattern + NotABundle, RegexOptions.IgnoreCase);
+                }
+
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var position = decimal.Parse(match.Groups["position"].Value, CultureInfo.InvariantCulture);
+
+                var link = s.LinkItems.Value.FirstOrDefault(l => decimal.TryParse(l.Position, NumberStyles.Any, CultureInfo.InvariantCulture, out var p) && p == position);
+
+                if (link == null)
+                {
+                    continue;
+                }
+
+                authorBooks ??= _bookService.GetBooksByAuthorMetadataId(author.AuthorMetadataId);
+                var book = authorBooks.FirstOrDefault(b => b.Id == link.BookId);
+
+                if (book != null)
+                {
+                    _logger.Debug("Matched '{0}' to {1} as {2} #{3}", title, book, s.Title, link.Position);
+                    return book;
+                }
+            }
+
+            return null;
         }
 
         public RemoteBook Map(ParsedBookInfo parsedBookInfo, int authorId, IEnumerable<int> bookIds)
