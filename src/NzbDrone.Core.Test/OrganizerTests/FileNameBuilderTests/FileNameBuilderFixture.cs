@@ -65,6 +65,9 @@ namespace NzbDrone.Core.Test.OrganizerTests.FileNameBuilderTests
             _namingConfig = NamingConfig.Default;
             _namingConfig.RenameBooks = true;
 
+            // These tests exercise the part tokens; keeping original names would bypass them.
+            _namingConfig.KeepPartFileNames = false;
+
             Mocker.GetMock<INamingConfigService>()
                   .Setup(c => c.GetConfig()).Returns(_namingConfig);
 

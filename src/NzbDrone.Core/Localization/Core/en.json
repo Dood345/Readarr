@@ -524,6 +524,8 @@
   "ItsEasyToAddANewAuthorOrBookJustStartTypingTheNameOfTheItemYouWantToAdd": "It's easy to add a New Author or Book just start typing the name of the item you want to add",
   "Label": "Label",
   "LabelIsRequired": "Label is required",
+  "KeepPartFileNames": "Keep File Names of Multi-Part Books",
+  "KeepPartFileNamesHelpText": "A book made of several files (chapter-per-file audiobooks) keeps its original file names; only the folder is renamed. Untagged rips carry chapter names only in the file name, which Audiobookshelf reads",
   "Language": "Language",
   "Large": "Large",
   "LastDuration": "Last Duration",

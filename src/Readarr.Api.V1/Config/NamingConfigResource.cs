@@ -5,6 +5,7 @@ namespace Readarr.Api.V1.Config
     public class NamingConfigResource : RestResource
     {
         public bool RenameBooks { get; set; }
+        public bool KeepPartFileNames { get; set; }
         public bool ReplaceIllegalCharacters { get; set; }
         public int ColonReplacementFormat { get; set; }
         public string StandardBookFormat { get; set; }
