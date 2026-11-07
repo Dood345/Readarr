@@ -21,6 +21,7 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             { "ebook_format", 0.1 },
             { "audio_format", 0.1 },
             { "wrong_format", 5.0 },
+            { "media_type", 1.0 },
             { "year", 1.0 },
             { "country", 0.5 },
             { "language", 5.0 },

@@ -147,6 +147,14 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
             // try to tilt it towards the correct "type" of release
             var isAudio = MediaFileExtensions.AudioExtensions.Contains(localTracks.First().Path.GetPathExtension());
 
+            // A book may carry an ebook edition and an audiobook edition with the same title. The
+            // format checks below only ever penalised text files landing on audio entries, so an
+            // m4b scored identically against both and was filed under the ebook edition - which
+            // then left the audiobook edition "missing" and up for download. Weighted below the
+            // title, so a book that only has an ebook edition still wins over a different book.
+            dist.AddBool("media_type", isAudio == edition.IsEbook);
+            Logger.Trace("media type: {0} vs {1}; {2}", isAudio ? "audio" : "text", edition.IsEbook ? "ebook" : "audiobook", dist.NormalizedDistance());
+
             if (edition.Format.IsNotNullOrWhiteSpace())
             {
                 if (!isAudio)
