@@ -38,7 +38,31 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 var word = words[i];
                 var letters = word.Where(char.IsLetter).ToList();
 
-                if (!letters.Any() || letters.Any(char.IsUpper))
+                if (!letters.Any())
+                {
+                    continue;
+                }
+
+                // "1950S" and "3E" are decade and edition markers, not initialisms.
+                if (letters.Count == 1 && char.IsUpper(letters[0]) && char.IsDigit(word[0]) && word.EndsWith("S"))
+                {
+                    words[i] = word.Substring(0, word.Length - 1) + "s";
+                    changed = true;
+                    continue;
+                }
+
+                // "Hunters Of Dune": a capitalised small word in the middle of a title is lowered,
+                // unless it opens a clause. Only a word that is nothing but a capital and lowercase
+                // letters, so "OF" in an all-caps title is left alone.
+                if (i > 0 && SmallWords.Contains(word.ToLowerInvariant()) && !EndsClause(words[i - 1]) &&
+                    char.IsUpper(word[0]) && word.Skip(1).All(char.IsLower))
+                {
+                    words[i] = word.ToLowerInvariant();
+                    changed = true;
+                    continue;
+                }
+
+                if (letters.Any(char.IsUpper))
                 {
                     continue;
                 }

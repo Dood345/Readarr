@@ -20,6 +20,12 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         [TestCase("Carl’s Doomsday Scenario", "Carl's Doomsday Scenario")]
         [TestCase("the dungeon anarchist’s cookbook", "The Dungeon Anarchist's Cookbook")]
         [TestCase("DUNE", "DUNE")]
+        [TestCase("Hunters Of Dune", "Hunters of Dune")]
+        [TestCase("Martin Luther King, Jr., Malcolm X, and the Civil Rights Struggle of the 1950S and 1960S", "Martin Luther King, Jr., Malcolm X, and the Civil Rights Struggle of the 1950s and 1960s")]
+        [TestCase("Reading the American Past 3E V2", "Reading the American Past 3E V2")]
+        [TestCase("DUNE OF THE DEAD", "DUNE OF THE DEAD")]
+        [TestCase("Of Mice and Men", "Of Mice and Men")]
+        [TestCase("Dune: Of Sand", "Dune: Of Sand")]
         [TestCase("", "")]
         [TestCase(null, null)]
         public void should_capitalise_lowercase_words_and_leave_the_rest(string title, string expected)
