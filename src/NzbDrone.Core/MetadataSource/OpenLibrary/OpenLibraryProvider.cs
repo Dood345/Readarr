@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
@@ -57,15 +56,18 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             var docs = _openLibrary.GetWorksByAuthor(key, MaxWorksPerAuthor);
 
             var audibleProducts = _audible.SearchByAuthor(metadata.Name, MaxAudibleResults);
-            var audibleByTitle = IndexByTitle(audibleProducts);
+            var works = DeduplicateWorks(docs);
 
-            var books = DeduplicateWorks(docs)
-                .Select(x => MapBook(x, audibleByTitle))
+            // Each Audible product is assigned to one work, keyed by the title the book will carry.
+            var audible = new AudibleTitleMatcher(audibleProducts, works.Select(x => TitleCasing.Normalize(x.Title)));
+
+            var books = works
+                .Select(x => MapBook(x, audible))
                 .ToList();
 
             books.ForEach(x => x.AuthorMetadata = metadata);
 
-            var series = BuildSeriesFromAudible(books, audibleProducts, audibleByTitle);
+            var series = BuildSeriesFromAudible(books, audibleProducts, audible);
 
             return new Author
             {
@@ -98,6 +100,16 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 .Where(x => x.Normalized.IsNotNullOrWhiteSpace())
                 .ToList();
 
+            // "Dune: The Butlerian Jihad", "The Butlerian Jihad" and "Dune Butlerian Jihad" are one
+            // book. Each work gets a set of keys - its colon segments, and its title with a leading
+            // series name (another work's whole title) removed - and works sharing a key collapse.
+            var titles = all.Select(x => x.Normalized).ToHashSet();
+
+            foreach (var work in all)
+            {
+                work.Keys = DedupKeys(work.Doc.Title, work.Normalized, titles);
+            }
+
             // Only multi-word titles are safe to look for inside another title. "Dune" occurs inside
             // "Dune Messiah", which is a different book.
             var phrases = all.Select(x => x.Normalized)
@@ -119,7 +131,8 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 // the same book when the two are close in length.
                 var existing = kept.FirstOrDefault(x =>
                     x.Normalized == candidate.Normalized ||
-                    IsSameBookByContainment(candidate.Normalized, x.Normalized));
+                    IsSameBookByContainment(candidate.Normalized, x.Normalized) ||
+                    x.Keys.Overlaps(candidate.Keys));
 
                 if (existing == null)
                 {
@@ -129,13 +142,53 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
                 // Same book twice: keep whichever record is richer, since that is the one more
                 // likely to be matched by an indexer and to carry usable covers and dates.
+                // Either way the survivor answers to both sets of keys, so a third variant of the
+                // same title still finds it.
+                existing.Keys.UnionWith(candidate.Keys);
+
                 if (Richness(candidate.Doc) > Richness(existing.Doc))
                 {
-                    kept[kept.IndexOf(existing)] = new WorkTitle(candidate.Doc, existing.Normalized);
+                    kept[kept.IndexOf(existing)] = new WorkTitle(candidate.Doc, existing.Normalized) { Keys = existing.Keys };
                 }
             }
 
             return kept.Select(x => x.Doc).ToList();
+        }
+
+        /// <summary>
+        /// Keys under which a work is recognised as the same book as another: each colon segment
+        /// of its title, and the title with a leading series name stripped, both without a leading
+        /// article. Single-word keys are left out - "dune" would merge the whole series, and
+        /// "Dune Messiah" minus "Dune" is just "messiah".
+        /// </summary>
+        private static HashSet<string> DedupKeys(string rawTitle, string normalized, HashSet<string> allTitles)
+        {
+            var keys = new HashSet<string>();
+
+            foreach (var segment in TitleNormalizer.Segments(rawTitle))
+            {
+                Add(keys, segment);
+            }
+
+            foreach (var other in allTitles)
+            {
+                if (other != normalized && normalized.StartsWith(other + " ", StringComparison.Ordinal))
+                {
+                    Add(keys, normalized.Substring(other.Length + 1));
+                }
+            }
+
+            return keys;
+        }
+
+        private static void Add(HashSet<string> keys, string value)
+        {
+            var key = TitleNormalizer.StripLeadingArticle(value);
+
+            if (TitleNormalizer.WordCount(key) >= 2)
+            {
+                keys.Add(key);
+            }
         }
 
         /// <summary>
@@ -211,6 +264,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
             public OpenLibrarySearchDoc Doc { get; }
             public string Normalized { get; }
+            public HashSet<string> Keys { get; set; } = new HashSet<string>();
         }
 
         /// <summary>
@@ -255,20 +309,21 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
             var primaryAuthor = metadata.First();
             var audibleProducts = _audible.Search($"{work.Title} {primaryAuthor.Name}", 10);
-            var audibleByTitle = IndexByTitle(audibleProducts);
 
             var book = MapBook(work);
             book.AuthorMetadata = primaryAuthor;
 
+            var audible = new AudibleTitleMatcher(audibleProducts, new[] { book.Title });
+
             var editions = _openLibrary.GetEditions(key, MaxEditionsPerWork);
             var mapped = editions.Select(MapEdition).Where(x => x != null).ToList();
 
-            AppendAudibleEditions(mapped, MatchAudible(book.Title, audibleByTitle));
+            AppendAudibleEditions(mapped, audible.For(book.Title));
             FinaliseEditions(book, mapped);
 
             // Called for its side effect: it populates book.SeriesLinks. The Series list itself is
             // not part of the tuple, matching how BookInfoProxy.PollBook uses MapSeriesLinks.
-            BuildSeriesFromAudible(new List<Book> { book }, audibleProducts, audibleByTitle);
+            BuildSeriesFromAudible(new List<Book> { book }, audibleProducts, audible);
 
             return Tuple.Create(primaryAuthor.ForeignAuthorId, book, metadata);
         }
@@ -517,7 +572,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 ApplyNameForms(metadata);
             }
 
-            var book = MapBook(doc, new Dictionary<string, List<AudibleProductResource>>());
+            var book = MapBook(doc, new AudibleTitleMatcher(new List<AudibleProductResource>(), new[] { doc.Title }));
             book.AuthorMetadata = metadata;
 
             var author = new Author
@@ -531,16 +586,17 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             return book;
         }
 
-        private Book MapBook(OpenLibrarySearchDoc doc, Dictionary<string, List<AudibleProductResource>> audibleByTitle)
+        private Book MapBook(OpenLibrarySearchDoc doc, AudibleTitleMatcher audible)
         {
             var workKey = OpenLibraryProxy.NormalizeKey(doc.Key);
+            var title = TitleCasing.Normalize(doc.Title);
 
             var book = new Book
             {
                 ForeignBookId = workKey,
                 TitleSlug = workKey,
-                Title = doc.Title,
-                CleanTitle = Parser.Parser.CleanAuthorName(doc.Title),
+                Title = title,
+                CleanTitle = Parser.Parser.CleanAuthorName(title),
                 Genres = doc.Subject?.Take(10).ToList() ?? new List<string>(),
                 RelatedBooks = new List<int>(),
                 ReleaseDate = doc.FirstPublishYear.HasValue
@@ -563,7 +619,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 {
                     ForeignEditionId = workKey,
                     TitleSlug = workKey,
-                    Title = doc.Title,
+                    Title = title,
                     Isbn13 = doc.Isbn?.FirstOrDefault(x => x != null && x.Length == 13),
                     Language = PreferredLanguage(doc.Language),
                     Format = "ebook",
@@ -576,7 +632,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                 }
             };
 
-            AppendAudibleEditions(editions, MatchAudible(doc.Title, audibleByTitle));
+            AppendAudibleEditions(editions, audible.For(title));
             FinaliseEditions(book, editions);
 
             return book;
@@ -585,13 +641,14 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         private Book MapBook(OpenLibraryWorkResource work)
         {
             var workKey = OpenLibraryProxy.NormalizeKey(work.Key);
+            var title = TitleCasing.Normalize(work.Title);
 
             var book = new Book
             {
                 ForeignBookId = workKey,
                 TitleSlug = workKey,
-                Title = work.Title,
-                CleanTitle = Parser.Parser.CleanAuthorName(work.Title),
+                Title = title,
+                CleanTitle = Parser.Parser.CleanAuthorName(title),
                 Genres = work.Subjects?.Take(10).ToList() ?? new List<string>(),
                 RelatedBooks = new List<int>(),
                 Ratings = new Ratings()
@@ -736,7 +793,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         /// </summary>
         private static List<Series> BuildSeriesFromAudible(List<Book> books,
             List<AudibleProductResource> products,
-            Dictionary<string, List<AudibleProductResource>> audibleByTitle)
+            AudibleTitleMatcher audible)
         {
             var series = new Dictionary<string, Series>();
             var links = new Dictionary<string, List<SeriesBookLink>>();
@@ -748,7 +805,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
             foreach (var book in books)
             {
-                foreach (var product in MatchAudible(book.Title, audibleByTitle))
+                foreach (var product in audible.For(book.Title))
                 {
                     foreach (var audibleSeries in product.Series ?? new List<AudibleSeries>())
                     {
@@ -800,43 +857,6 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             }
 
             return series.Values.ToList();
-        }
-
-        private static Dictionary<string, List<AudibleProductResource>> IndexByTitle(List<AudibleProductResource> products)
-        {
-            var index = new Dictionary<string, List<AudibleProductResource>>();
-
-            foreach (var product in products)
-            {
-                var key = NormalizeTitle(product.Title);
-
-                if (key.IsNullOrWhiteSpace())
-                {
-                    continue;
-                }
-
-                if (!index.TryGetValue(key, out var list))
-                {
-                    list = new List<AudibleProductResource>();
-                    index[key] = list;
-                }
-
-                list.Add(product);
-            }
-
-            return index;
-        }
-
-        private static List<AudibleProductResource> MatchAudible(string title, Dictionary<string, List<AudibleProductResource>> index)
-        {
-            var key = NormalizeTitle(title);
-
-            if (key.IsNullOrWhiteSpace() || !index.TryGetValue(key, out var matches))
-            {
-                return new List<AudibleProductResource>();
-            }
-
-            return matches;
         }
 
         /// <summary>
@@ -892,32 +912,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         /// </summary>
         private static string NormalizeTitle(string title, bool stripSubtitle)
         {
-            if (title.IsNullOrWhiteSpace())
-            {
-                return string.Empty;
-            }
-
-            var colon = title.IndexOf(':');
-            var trimmed = stripSubtitle && colon > 0 ? title.Substring(0, colon) : title;
-
-            var builder = new StringBuilder(trimmed.Length);
-            var lastWasSpace = false;
-
-            foreach (var c in trimmed)
-            {
-                if (char.IsLetterOrDigit(c))
-                {
-                    builder.Append(char.ToLowerInvariant(c));
-                    lastWasSpace = false;
-                }
-                else if (!lastWasSpace && builder.Length > 0)
-                {
-                    builder.Append(' ');
-                    lastWasSpace = true;
-                }
-            }
-
-            return builder.ToString().Trim();
+            return TitleNormalizer.Normalize(title, stripSubtitle);
         }
 
         /// <summary>

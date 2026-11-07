@@ -46,6 +46,32 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         }
 
         [Test]
+        public void should_collapse_series_prefixed_and_subtitled_variants_of_the_same_book()
+        {
+            // Brian Herbert's bibliography carried The Butlerian Jihad three times. The epub landed
+            // on one record and the m4b on another, so the two formats of one book were two books.
+            var titles = TitlesFor(
+                Work("W1", "Dune"),
+                Work("W2", "The Butlerian Jihad"),
+                Work("W3", "Dune: The Butlerian Jihad: Book One of the Legends of Dune Trilogy"),
+                Work("W4", "Dune Butlerian Jihad"),
+                Work("W5", "Dune Messiah"));
+
+            titles.Should().BeEquivalentTo("Dune", "The Butlerian Jihad", "Dune Messiah");
+        }
+
+        [Test]
+        public void should_not_merge_a_book_whose_remainder_after_the_series_name_is_one_word()
+        {
+            var titles = TitlesFor(
+                Work("W1", "Dune"),
+                Work("W2", "Dune Messiah"),
+                Work("W3", "Messiah"));
+
+            titles.Should().BeEquivalentTo("Dune", "Dune Messiah", "Messiah");
+        }
+
+        [Test]
         public void should_drop_an_omnibus_without_taking_the_books_it_names()
         {
             // The order of the two filters matters: matching contained titles first would collapse
