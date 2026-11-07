@@ -153,3 +153,7 @@ _temp_*/**/*
 
 # API doc generation
 .config/
+
+# Scratch API dumps and Claude Code session data
+_p.json
+.claude/
