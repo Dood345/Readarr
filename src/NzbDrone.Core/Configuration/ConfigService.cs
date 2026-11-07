@@ -110,6 +110,13 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("RssSyncInterval", value); }
         }
 
+        public int MissingBookSearchInterval
+        {
+            get { return GetValueInt("MissingBookSearchInterval", 24); }
+
+            set { SetValue("MissingBookSearchInterval", value); }
+        }
+
         public int MaximumSize
         {
             get { return GetValueInt("MaximumSize", 0); }
