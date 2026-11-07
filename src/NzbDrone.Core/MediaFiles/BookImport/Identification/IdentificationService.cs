@@ -183,6 +183,12 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
 
             _logger.Debug($"Best release found in {watch.ElapsedMilliseconds}ms");
 
+            // The candidate's existing files only ever inform the distance. Every file in a scan
+            // is identified by its own group, so folding them into this release as well would
+            // produce a second import decision for the same file - one that could point at a
+            // different edition than the file's own identification did.
+            localBookRelease.ExistingTracks = new List<LocalBook>();
+
             localBookRelease.PopulateMatch(config.KeepAllEditions);
 
             _logger.Debug($"IdentifyRelease done in {watch.ElapsedMilliseconds}ms");

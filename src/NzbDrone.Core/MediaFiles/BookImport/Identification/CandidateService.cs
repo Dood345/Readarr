@@ -123,10 +123,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
                 .Distinct()
                 .ToDictionary(id => id, id => includeExisting ? _mediaFileService.GetFilesByBook(id) : new List<BookFile>());
 
+            // Only the candidate edition's own files, not every file of the book: an epub and an
+            // m4b of one book are different editions, and letting the ebook edition claim the m4b
+            // as an "existing track" put audio files back on text editions during a rescan.
             return editions.Select(x => new CandidateEdition
             {
                 Edition = x,
-                ExistingFiles = bookFiles[x.BookId]
+                ExistingFiles = bookFiles[x.BookId].Where(f => f.EditionId == x.Id).ToList()
             }).ToList();
         }
 
