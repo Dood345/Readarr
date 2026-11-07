@@ -159,11 +159,44 @@ namespace NzbDrone.Core.Indexers.Slskd
                 Guid = SlskdIds.ForDownload(response.Username, directory),
                 Title = title,
                 Size = files.Sum(f => f.Size),
+                Bitrate = EstimateBitrate(files),
                 DownloadUrl = locator.ToDownloadUrl(),
                 InfoUrl = null,
                 PublishDate = DateTime.UtcNow,
                 DownloadProtocol = nameof(SoulseekDownloadProtocol)
             };
+        }
+
+        /// <summary>
+        /// Soulseek peers attach a duration and a nominal bitrate to audio files. The release's
+        /// bitrate is total size over total duration across the files that carry either, in kbps,
+        /// so a chapter-per-file rip and a single m4b of the same encode come out the same. 0 when
+        /// no file says anything.
+        /// </summary>
+        internal static int EstimateBitrate(List<SlskdFile> files)
+        {
+            long bytes = 0;
+            double seconds = 0;
+
+            foreach (var file in files.Where(f => f.Size > 0))
+            {
+                if (file.Length > 0)
+                {
+                    seconds += file.Length;
+                }
+                else if (file.BitRate > 0)
+                {
+                    seconds += file.Size * 8.0 / (file.BitRate.Value * 1000.0);
+                }
+                else
+                {
+                    continue;
+                }
+
+                bytes += file.Size;
+            }
+
+            return seconds > 0 ? (int)Math.Round(bytes * 8.0 / seconds / 1000.0) : 0;
         }
 
         /// <summary>

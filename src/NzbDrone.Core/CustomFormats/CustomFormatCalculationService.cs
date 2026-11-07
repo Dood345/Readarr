@@ -40,7 +40,8 @@ namespace NzbDrone.Core.CustomFormats
                 BookInfo = remoteBook.ParsedBookInfo,
                 Author = remoteBook.Author,
                 Size = size,
-                IndexerFlags = remoteBook.Release?.IndexerFlags ?? 0
+                IndexerFlags = remoteBook.Release?.IndexerFlags ?? 0,
+                Bitrate = remoteBook.Release?.Bitrate ?? 0
             };
 
             return ParseCustomFormat(input);
@@ -121,6 +122,7 @@ namespace NzbDrone.Core.CustomFormats
                 Author = localBook.Author,
                 Size = localBook.Size,
                 IndexerFlags = localBook.IndexerFlags,
+                Bitrate = localBook.FileTrackInfo?.MediaInfo?.AudioBitrate ?? 0
             };
 
             return ParseCustomFormat(input);
@@ -188,7 +190,8 @@ namespace NzbDrone.Core.CustomFormats
                 Author = author,
                 Size = bookFile.Size,
                 IndexerFlags = bookFile.IndexerFlags,
-                Filename = Path.GetFileName(bookFile.Path)
+                Filename = Path.GetFileName(bookFile.Path),
+                Bitrate = bookFile.MediaInfo?.AudioBitrate ?? 0
             };
 
             return ParseCustomFormat(input, allCustomFormats);

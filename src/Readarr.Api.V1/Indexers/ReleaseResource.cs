@@ -20,6 +20,7 @@ namespace Readarr.Api.V1.Indexers
         public double AgeHours { get; set; }
         public double AgeMinutes { get; set; }
         public long Size { get; set; }
+        public int Bitrate { get; set; }
         public int IndexerId { get; set; }
         public string Indexer { get; set; }
         public string ReleaseGroup { get; set; }
@@ -86,6 +87,7 @@ namespace Readarr.Api.V1.Indexers
                 AgeHours = releaseInfo.AgeHours,
                 AgeMinutes = releaseInfo.AgeMinutes,
                 Size = releaseInfo.Size,
+                Bitrate = releaseInfo.Bitrate,
                 IndexerId = releaseInfo.IndexerId,
                 Indexer = releaseInfo.Indexer,
                 ReleaseGroup = parsedBookInfo.ReleaseGroup,
@@ -140,6 +142,7 @@ namespace Readarr.Api.V1.Indexers
             model.Guid = resource.Guid;
             model.Title = resource.Title;
             model.Size = resource.Size;
+            model.Bitrate = resource.Bitrate;
             model.DownloadUrl = resource.DownloadUrl;
             model.InfoUrl = resource.InfoUrl;
             model.CommentUrl = resource.CommentUrl;

@@ -11,6 +11,9 @@ namespace NzbDrone.Core.CustomFormats
         public IndexerFlags IndexerFlags { get; set; }
         public string Filename { get; set; }
 
+        // Audio bitrate in kbps, 0 when unknown
+        public int Bitrate { get; set; }
+
         // public CustomFormatInput(ParsedEpisodeInfo episodeInfo, Series series)
         // {
         //     EpisodeInfo = episodeInfo;

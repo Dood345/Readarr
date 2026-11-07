@@ -236,5 +236,67 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
 
             releases[0].Title.Should().EndWith("[MP3]");
         }
+
+        [Test]
+        public void should_estimate_bitrate_from_size_and_duration()
+        {
+            // 526 MB over 18h24m is what a 64 kbps Audible rip looks like
+            var files = new List<SlskdFile>
+            {
+                new SlskdFile { Filename = @"Books\Riot\Riot.m4b", Size = 525937321, Length = 66266, BitRate = 62 }
+            };
+
+            SlskdIndexer.EstimateBitrate(files).Should().Be(63);
+        }
+
+        [Test]
+        public void should_estimate_bitrate_across_chapter_files()
+        {
+            var files = new List<SlskdFile>
+            {
+                new SlskdFile { Filename = @"Books\DoB\01.mp3", Size = 9_600_000, Length = 600 },
+                new SlskdFile { Filename = @"Books\DoB\02.mp3", Size = 4_800_000, Length = 300 },
+                new SlskdFile { Filename = @"Books\DoB\cover.jpg", Size = 100_000 }
+            };
+
+            SlskdIndexer.EstimateBitrate(files).Should().Be(128);
+        }
+
+        [Test]
+        public void should_fall_back_to_the_reported_bitrate_when_duration_is_missing()
+        {
+            var files = new List<SlskdFile>
+            {
+                new SlskdFile { Filename = @"Books\DoB\01.mp3", Size = 9_600_000, BitRate = 128 },
+                new SlskdFile { Filename = @"Books\DoB\02.mp3", Size = 4_800_000, BitRate = 128 }
+            };
+
+            SlskdIndexer.EstimateBitrate(files).Should().Be(128);
+        }
+
+        [Test]
+        public void should_report_unknown_bitrate_when_no_file_has_attributes()
+        {
+            var files = new List<SlskdFile>
+            {
+                new SlskdFile { Filename = @"Books\DoB\01.mp3", Size = 9_600_000 },
+                new SlskdFile { Filename = @"Books\DoB\02.mp3", Size = 4_800_000 }
+            };
+
+            SlskdIndexer.EstimateBitrate(files).Should().Be(0);
+        }
+
+        [Test]
+        public void should_put_the_bitrate_on_the_release()
+        {
+            var peer = Peer("bob", @"Books\DoB\01.mp3", @"Books\DoB\02.mp3");
+            peer.Files.ForEach(f =>
+            {
+                f.Size = 960_000;
+                f.Length = 60;
+            });
+
+            Build(peer)[0].Bitrate.Should().Be(128);
+        }
     }
 }

@@ -36,6 +36,10 @@ namespace NzbDrone.Core.Parser.Model
 
         public List<Language> Languages { get; set; }
 
+        // Average audio bitrate in kbps when the indexer knows it (slskd peers report bitrate and
+        // duration per file); 0 when unknown. 120 kbps is 0.9 MB per minute.
+        public int Bitrate { get; set; }
+
         [JsonIgnore]
         public IndexerFlags IndexerFlags { get; set; }
 
