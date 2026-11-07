@@ -91,6 +91,19 @@ namespace NzbDrone.Core.MediaFiles.BookImport
             var addedAuthors = new List<Author>();
             var addedBooks = new List<Book>();
 
+            // A rescan that re-identifies known files can decide the same file twice: once from
+            // its own folder and once pulled in as an "existing file" of a sibling book's
+            // candidate edition. Keep the closer match. Two records for one path would violate
+            // the unique index on insert - after the previous records had already been deleted,
+            // which took every file in the batch out of the database.
+            decisions = decisions
+                .Where(e => !e.Item.ExistingFile)
+                .Concat(decisions
+                    .Where(e => e.Item.ExistingFile)
+                    .GroupBy(e => e.Item.Path)
+                    .Select(g => g.OrderByDescending(e => e.Approved).ThenBy(e => e.Item.Distance?.NormalizedDistance() ?? 1.0).First()))
+                .ToList();
+
             var bookDecisions = decisions.Where(e => e.Item.Book != null && e.Approved)
                 .GroupBy(e => e.Item.Book.ForeignBookId).ToList();
 
