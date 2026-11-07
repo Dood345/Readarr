@@ -34,8 +34,15 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
                 .Setup(x => x.GetAuthor(It.IsAny<string>()))
                 .Returns(new OpenLibraryAuthorResource { Key = "/authors/OL1A", Name = "Frank Herbert" });
 
+            // The provider asks twice - once restricted to English, once unrestricted - and rescues
+            // no-language works that Audible knows. Serving both requests from the same list keeps
+            // these cases about deduplication alone.
             Mocker.GetMock<IOpenLibraryProxy>()
-                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>()))
+                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>(), "eng"))
+                .Returns(works.ToList());
+
+            Mocker.GetMock<IOpenLibraryProxy>()
+                .Setup(x => x.GetWorksByAuthor(It.IsAny<string>(), It.IsAny<int>(), null))
                 .Returns(works.ToList());
 
             Mocker.GetMock<IAudibleProxy>()

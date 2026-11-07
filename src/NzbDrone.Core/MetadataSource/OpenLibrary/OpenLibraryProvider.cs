@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Books;
@@ -29,6 +30,52 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         // as the same book recorded twice.
         private const double ContainmentWordRatio = 0.6;
 
+        private const string EnglishLanguageCode = "eng";
+
+        // Credited authors at or above which a record is an anthology rather than the author's book.
+        private const int MinAuthorsForAnthology = 5;
+
+        /// <summary>
+        /// Things Open Library files against an author that nobody would download as a book.
+        /// Matched against the raw title, case-insensitively.
+        /// </summary>
+        private static readonly Regex[] NonBookProductPatterns =
+        {
+            // Collections that ship several books as one product.
+            new Regex(@"\bbox(ed)?[ -]?set\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bomnibus\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcomplete series\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b(complete|unpublished) novels\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcollection-\d+\s*vol", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bset of \d+ books?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b\d+[- ]book\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\(set\)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Merchandise and adaptations.
+            new Regex(@"\bcolou?ring book\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcalendar\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bgraphic novel\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcomic (bk|book)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bcassette\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bsparknotes\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bstudy guide\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bnotebooks of\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Retail display units and publisher stock codes: "Trudi Canavan Header Whsmith",
+            // "Herbert 15mxpk", "Herbert Tie-in 20mfl".
+            new Regex(@"\bwhsmith\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\b\d+m[a-z]{2,}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // A single book split across volumes: "Dune Messiah (1 of 2)".
+            new Regex(@"\(\d+ of \d+\)", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+            // Magazine issues the author has a story in.
+            new Regex(@"\banalog\b.*\b(19|20)\d\d\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\banalog science fiction\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bscience fiction magazine\b", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex(@"\bvolume [\divxl]+, no\.", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        };
+
         private readonly IOpenLibraryProxy _openLibrary;
         private readonly IAudibleProxy _audible;
         private readonly Logger _logger;
@@ -53,9 +100,9 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             }
 
             var metadata = MapAuthorMetadata(resource, key);
-            var docs = _openLibrary.GetWorksByAuthor(key, MaxWorksPerAuthor);
-
             var audibleProducts = _audible.SearchByAuthor(metadata.Name, MaxAudibleResults);
+
+            var docs = GetEnglishWorks(key, audibleProducts);
             var works = DeduplicateWorks(docs);
 
             // Each Audible product is assigned to one work, keyed by the title the book will carry.
@@ -79,6 +126,63 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         }
 
         /// <summary>
+        /// An author's English-language works. Open Library lists translations as works in their
+        /// own right, and most of those records carry no language field at all, so filtering the
+        /// projected field kept every one of them - 83 of Trudi Canavan's 131 works, one real book
+        /// in five. The search endpoint's own <c>language=eng</c> filter is far better informed.
+        ///
+        /// It is also stricter than wanted: a work Open Library has no language data for is dropped
+        /// too, and some of those are real English books ("Hunters of Dune"). Those are asked for
+        /// in a second, unfiltered request and rescued when Audible knows an audiobook of them - an
+        /// English audiobook is as good a statement of language as the catalogue was going to make.
+        /// Confirming them against the work's editions was tried before and recovered nothing, and
+        /// title heuristics mistake Polish and Dutch titles for English.
+        /// </summary>
+        private List<OpenLibrarySearchDoc> GetEnglishWorks(string authorKey, List<AudibleProductResource> audibleProducts)
+        {
+            var english = _openLibrary.GetWorksByAuthor(authorKey, MaxWorksPerAuthor, EnglishLanguageCode);
+            var englishKeys = english.Select(x => x.Key).ToHashSet();
+
+            var unknownLanguage = _openLibrary.GetWorksByAuthor(authorKey, MaxWorksPerAuthor)
+                .Where(x => x.Key.IsNotNullOrWhiteSpace() && !englishKeys.Contains(x.Key))
+                .Where(x => x.Language == null || x.Language.Count == 0)
+                .ToList();
+
+            if (!unknownLanguage.Any())
+            {
+                return english;
+            }
+
+            var audible = new AudibleTitleMatcher(audibleProducts, unknownLanguage.Select(x => TitleCasing.Normalize(x.Title)));
+            var rescued = unknownLanguage.Where(x => audible.For(TitleCasing.Normalize(x.Title)).Any()).ToList();
+
+            _logger.Debug("{0}: {1} English works, {2} with no language data of which {3} have an audiobook and are kept", authorKey, english.Count, unknownLanguage.Count, rescued.Count);
+
+            return english.Concat(rescued).ToList();
+        }
+
+        /// <summary>
+        /// Open Library files a good deal that is not a book against an author: calendars,
+        /// colouring books, magazine issues the author has a story in, box sets, study guides, split
+        /// volumes ("Dune Messiah (1 of 2)") and publisher stock codes ("Herbert 15mxpk").
+        /// </summary>
+        private static bool IsNonBookProduct(string title)
+        {
+            return NonBookProductPatterns.Any(x => x.IsMatch(title ?? string.Empty));
+        }
+
+        /// <summary>
+        /// An anthology the author contributed a single story to, rather than a book they wrote.
+        /// Credited-author count is the usable signal: "TV 2000" lists nineteen, and one Frank
+        /// Herbert record lists eighty-six. The threshold has to clear genuine collaborations -
+        /// "The Road to Dune" credits four and is a real book - which is why it is five.
+        /// </summary>
+        private static bool IsAnthologyContribution(OpenLibrarySearchDoc doc)
+        {
+            return (doc.AuthorNames?.Count ?? 0) >= MinAuthorsForAnthology;
+        }
+
+        /// <summary>
         /// Open Library holds several work records for the same book, and separate records for
         /// collections, so an author's bibliography arrives with noise in it. Two shapes are dealt
         /// with here, in this order:
@@ -95,7 +199,8 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
         {
             var all = docs
                 .Where(x => x.Key.IsNotNullOrWhiteSpace())
-                .Where(HasEnglishEdition)
+                .Where(x => !IsNonBookProduct(x.Title))
+                .Where(x => !IsAnthologyContribution(x))
                 .Select(x => new WorkTitle(x, NormalizeTitle(x.Title, stripSubtitle: false)))
                 .Where(x => x.Normalized.IsNotNullOrWhiteSpace())
                 .ToList();
@@ -189,19 +294,6 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             {
                 keys.Add(key);
             }
-        }
-
-        /// <summary>
-        /// Open Library lists translations as works in their own right, so an author's bibliography
-        /// arrives with the German, Spanish, Polish and Portuguese editions of books already in it -
-        /// 16 of Trudi Canavan's 131 works. A work is kept when it says nothing about language,
-        /// since unknown is not the same as "not English".
-        /// </summary>
-        private static bool HasEnglishEdition(OpenLibrarySearchDoc doc)
-        {
-            return doc.Language == null
-                   || doc.Language.Count == 0
-                   || doc.Language.Contains("eng");
         }
 
         /// <summary>

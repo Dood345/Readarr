@@ -1,5 +1,16 @@
 # Multi-format plan: one book, an ebook and an audiobook
 
+> **Status (2026-11-07).** Written 2026-08-07 against `865d1431`; brought onto `develop` after the
+> library-organising work of 2026-11-06/07 delivered most of it a different way. What is done:
+> stage 0 (media type is derived, `BookMediaType`), stage 1 (upgrades, imports and the grab-side
+> specifications stay inside a media type — defects 1–3), stage 2 in spirit (the cutoff is resolved
+> per media type by `QualityProfile.CutoffFor` rather than a stored `Cutoffs` column, so there was no
+> migration 043 for it; the "eBook + Audiobook" profile is seeded), and stage 4 (`{Work Title}`
+> naming, `KeepPartFileNames`). Still open: stage 3 (per-format Wanted/Missing and statistics),
+> stage 5 (format columns in the API and UI), stage 6 (release-side format detection), and defect
+> 4 (`FixMultipleMonitoredEditions` housekeeping). Migration numbers below are stale — the next is
+> **046**. Read the rest as the design rationale and the backlog, not as instructions.
+
 Working plan for making Readarr handle a book that exists in more than one format, from the core
 outwards. Read alongside `CLAUDE.md` (the map) and `ROADMAP.md` (the revival history).
 

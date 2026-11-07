@@ -294,6 +294,15 @@ no longer triggers an import attempt (300+ failed ones in two months). Download 
 randomises per process. **Both bugs are still in the sibling Lidarr fork** (`../Liedarr`,
 `Download/Clients/Slskd/Slskd.cs`, `Indexers/Slskd/SlskdIndexer.cs`) and port with renames.
 
+Round 4: the `worktree-multi-format-plan` branch (2026-08-08) was brought in — `PLAN-MULTI-FORMAT.md`
+with a status header, the bibliography-accuracy corpus and fixture, and the padding filters
+(server-side `language=eng`, non-book-product patterns, anthology rule), re-applied on top of the
+dedup and Audible-matcher work with one addition: works Open Library has no language data for are
+kept when Audible has an audiobook of them, which is what saves "Hunters of Dune". Measured on the
+committed payloads: Frank Herbert 104→56 works (43% precision, 100% recall), Trudi Canavan 87→18
+(100%, 4 duplicate records left), Brian Herbert 99→47 (64%, 30/32 — the two are the no-language
+books, rescued only in production where Audible answers).
+
 Open: Audible lists Harry Potter under the US titles, so those books have no audiobook edition and
 their mp3s sit on the text editions; a per-book Audible title search as a fallback would fix it.
 `.mobi` duplicates of epubs stay unmapped by design (lower text quality); Trudi Canavan has four.

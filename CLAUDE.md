@@ -200,6 +200,14 @@ Notes that are easy to get wrong:
 - **Open Library's search `language` field is a work-level aggregate in arbitrary order** — not the
   language of any one edition. Use `PreferredLanguage`, not `First()`.
 - **Open Library author search ranks poorly** and is re-sorted by `RankAuthors`.
+- **Bibliographies are fetched with `language=eng` server-side** (`GetEnglishWorks`): most
+  translation records carry no language field, so a client-side check kept them all. Works with
+  no language data at all are fetched unfiltered and kept only when Audible knows an audiobook of
+  them. `NonBookProductPatterns` and the ≥5-credited-authors anthology rule drop merchandise,
+  box sets, magazine issues and split volumes. `BibliographyAccuracyFixture` scores all of this
+  against a hand-curated corpus (`Files/MetadataSource/OpenLibrary/`); its `report_accuracy` test
+  prints recall/precision per author, the floor assertions are `[Explicit]` because the corpus is
+  the fork owner's best effort, not ground truth. `refresh-corpus.sh` regenerates the payloads.
 - **Audible is an undocumented app API.** All enrichment is best-effort and must degrade to "no
   audiobook data" rather than failing a lookup.
 - `IProvideSeriesInfo`/`IProvideListInfo` are *not* part of this path — they belong to the Goodreads

@@ -13,7 +13,7 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
     {
         List<OpenLibraryAuthorSearchDoc> SearchAuthors(string query);
         OpenLibraryAuthorResource GetAuthor(string authorKey);
-        List<OpenLibrarySearchDoc> GetWorksByAuthor(string authorKey, int limit);
+        List<OpenLibrarySearchDoc> GetWorksByAuthor(string authorKey, int limit, string language = null);
         List<OpenLibrarySearchDoc> SearchWorks(string query, int limit);
         OpenLibraryWorkResource GetWork(string workKey);
         List<OpenLibraryEditionResource> GetEditions(string workKey, int limit);
@@ -60,10 +60,25 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             return Get<OpenLibraryAuthorResource>($"{BaseUrl}/authors/{NormalizeKey(authorKey)}.json");
         }
 
-        public List<OpenLibrarySearchDoc> GetWorksByAuthor(string authorKey, int limit)
+        /// <summary>
+        /// The author's works. Passing <paramref name="language"/> restricts the result to works
+        /// Open Library records an edition in that language for.
+        /// </summary>
+        /// <remarks>
+        /// The server-side filter is far better informed than the <c>language</c> field this
+        /// endpoint projects: most translation records carry no language at all, so a client-side
+        /// check kept every one of them - 83 of Trudi Canavan's 131 works. It is not free: a work
+        /// Open Library has no language data for is excluded too, so callers that need those back
+        /// ask for the unfiltered set as well and decide for themselves.
+        /// </remarks>
+        public List<OpenLibrarySearchDoc> GetWorksByAuthor(string authorKey, int limit, string language = null)
         {
+            var filter = language.IsNullOrWhiteSpace()
+                ? string.Empty
+                : $"&language={Uri.EscapeDataString(language)}";
+
             var response = Get<OpenLibrarySearchResponse>(
-                $"{BaseUrl}/search.json?author_key={NormalizeKey(authorKey)}&fields={SearchFields}&limit={limit}");
+                $"{BaseUrl}/search.json?author_key={NormalizeKey(authorKey)}&fields={SearchFields}&limit={limit}{filter}");
 
             return response?.Docs ?? new List<OpenLibrarySearchDoc>();
         }
