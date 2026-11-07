@@ -234,9 +234,12 @@ in the session notes):
   move authors onto it (Author → Edit, or Mass Editor).
 - slskd indexer: `flac` dropped from the default extensions (music), and a folder that offers an
   m4b next to mp3 chapter parts now yields only the m4b.
-- `SixLabors.ImageSharp` 3.1.12 → 3.2.0: six new advisories made `TreatWarningsAsErrors` fail
-  the build outright, so the image could not be rebuilt at all. The Lidarr fork pins the same
-  version and needs the same bump.
+- `SixLabors.ImageSharp` 3.1.12 has six open advisories that made `TreatWarningsAsErrors` fail
+  the restore outright, so the image could not be rebuilt at all. 3.2.0 patches them but, like
+  every 4.x, refuses to compile in Release without a Six Labors license key
+  (`SixLaborsLicenseKey`), so the fork stays on 3.1.12 and `Directory.Build.props` keeps the
+  NU1901–NU1904 audit codes as warnings. A free OSS key from sixlabors.com would allow the bump.
+  The Lidarr fork pins the same version and has the same problem.
 
 Still open: the `Slskd` download client adopts every finished slskd folder (hardcoded
 `Category = "Readarr"`), including Lidarr/soularr music — 300+ failed import attempts in

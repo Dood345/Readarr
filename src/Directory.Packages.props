@@ -48,7 +48,10 @@
     <PackageVersion Include="Selenium.WebDriver.ChromeDriver" Version="134.0.6998.16500" />
     <PackageVersion Include="Sentry" Version="4.0.2" />
     <PackageVersion Include="SharpZipLib" Version="1.4.2" />
-    <PackageVersion Include="SixLabors.ImageSharp" Version="3.2.0" />
+    <!-- 3.1.12 is the last ImageSharp that builds without a Six Labors license key: 3.2.0 and 4.x
+         fail Release builds outright unless $(SixLaborsLicenseKey) is set. Its open advisories are
+         handled by WarningsNotAsErrors in Directory.Build.props. -->
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.1.118" />
     <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="6.6.2" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.6.2" />
