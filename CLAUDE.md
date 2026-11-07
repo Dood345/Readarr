@@ -239,6 +239,14 @@ first — because keying on the title before the colon filed every "Dune: X" aud
 folders. Dedup in `OpenLibraryProvider.DeduplicateWorks` also merges series-prefixed and subtitled
 variants ("Dune: The Butlerian Jihad" ≡ "The Butlerian Jihad" ≡ "Dune Butlerian Jihad").
 
+Release→book mapping (`ParsingService.GetBooks`) checks the author's series before anything else:
+a release reading "<Series>, Book N" / "<Series> #N" / "Vol N - <Series>" is the book linked at
+position N. Without it, a search for "Dominion of Blades" (book 1, same name as the series) grabbed
+"The Hobgoblin Riot: Dominion of Blades, Book 2" because the search-criteria parser found the
+searched title inside the release name and forced it. Bare numbers ("<Series> 2") and bundles
+("2 <Series> Books") deliberately do not count. Audible-style "Title: Series, Book N" is the normal
+slskd audiobook folder name, so this rule fires constantly.
+
 Soulseek has no RSS. `MissingBookSearchCommand` is on the scheduler (`MissingBookSearchInterval`,
 hours, Settings → Indexers) because nothing on slskd is ever found otherwise.
 
