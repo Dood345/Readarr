@@ -16,6 +16,8 @@ namespace NzbDrone.Core.Indexers.Slskd
 {
     public class SlskdIndexer : IndexerBase<SlskdIndexerSettings>
     {
+        private static readonly HashSet<string> SingleFileAudiobookExtensions = new HashSet<string> { "m4b", "m4a" };
+
         private readonly ISlskdProxy _proxy;
 
         public override string Name => "Slskd";
@@ -113,12 +115,14 @@ namespace NzbDrone.Core.Indexers.Slskd
                 // that the protocol exposes.
                 foreach (var group in candidates.GroupBy(f => GetDirectory(f.Filename)))
                 {
-                    if (group.Key.IsNullOrWhiteSpace() || group.Count() < settings.MinimumFileCount)
+                    var files = PreferSingleFileAudiobook(group.ToList());
+
+                    if (group.Key.IsNullOrWhiteSpace() || files.Count < settings.MinimumFileCount)
                     {
                         continue;
                     }
 
-                    releases.Add(BuildRelease(response, group.Key, group.ToList(), artistName));
+                    releases.Add(BuildRelease(response, group.Key, files, artistName));
                 }
             }
 
@@ -160,6 +164,18 @@ namespace NzbDrone.Core.Indexers.Slskd
                 PublishDate = DateTime.UtcNow,
                 DownloadProtocol = nameof(SoulseekDownloadProtocol)
             };
+        }
+
+        /// <summary>
+        /// A folder that shares an m4b next to a chapter-per-file mp3 rip holds the same audiobook
+        /// twice. Grabbing everything would import both as parts of one edition, so when a
+        /// single-file container is on offer only those files make up the release.
+        /// </summary>
+        internal static List<SlskdFile> PreferSingleFileAudiobook(List<SlskdFile> files)
+        {
+            var containers = files.Where(f => SingleFileAudiobookExtensions.Contains(GetExtension(f.Filename))).ToList();
+
+            return containers.Any() && containers.Count < files.Count ? containers : files;
         }
 
         private static string GetDirectory(string filename)

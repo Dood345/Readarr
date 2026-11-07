@@ -27,7 +27,10 @@ namespace NzbDrone.Core.Indexers.Slskd
             MinimumFileCount = 1;
             MaximumQueueLength = 100;
             IncludeLockedResults = false;
-            AllowedExtensions = "epub,mobi,azw3,pdf,m4b,mp3,m4a,flac";
+
+            // No flac: it is a music format in practice, and allowing it makes a title search return
+            // soundtracks and albums that merely share a name with the book.
+            AllowedExtensions = "epub,mobi,azw3,pdf,m4b,mp3,m4a";
         }
 
         [FieldDefinition(0, Label = "URL", HelpText = "URL of your slskd instance, for example http://slskd:5030")]

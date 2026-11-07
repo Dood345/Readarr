@@ -81,8 +81,8 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         {
             // Soulseek returns loose files; an album only exists as "files sharing a folder".
             var releases = Build(Peer("bob",
-                @"Music\Pink Floyd\Wish You Were Here\01 Shine On.flac",
-                @"Music\Pink Floyd\Wish You Were Here\02 Have A Cigar.flac"));
+                @"Music\Pink Floyd\Wish You Were Here\01 Shine On.mp3",
+                @"Music\Pink Floyd\Wish You Were Here\02 Have A Cigar.mp3"));
 
             releases.Should().HaveCount(1);
             releases[0].Size.Should().Be(2000);
@@ -92,10 +92,10 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         public void should_emit_separate_releases_per_folder()
         {
             var releases = Build(Peer("bob",
-                @"Music\Pink Floyd\Wish You Were Here\01 Shine On.flac",
-                @"Music\Pink Floyd\Wish You Were Here\02 Have A Cigar.flac",
-                @"Music\Pink Floyd\Animals\01 Pigs On The Wing.flac",
-                @"Music\Pink Floyd\Animals\02 Dogs.flac"));
+                @"Music\Pink Floyd\Wish You Were Here\01 Shine On.mp3",
+                @"Music\Pink Floyd\Wish You Were Here\02 Have A Cigar.mp3",
+                @"Music\Pink Floyd\Animals\01 Pigs On The Wing.mp3",
+                @"Music\Pink Floyd\Animals\02 Dogs.mp3"));
 
             releases.Should().HaveCount(2);
         }
@@ -104,8 +104,8 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         public void should_emit_separate_releases_per_peer()
         {
             var releases = Build(
-                Peer("bob", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac"),
-                Peer("alice", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac"));
+                Peer("bob", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3"),
+                Peer("alice", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3"));
 
             releases.Should().HaveCount(2);
             releases.Select(r => r.Guid).Should().OnlyHaveUniqueItems();
@@ -115,7 +115,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         public void should_skip_folders_below_minimum_file_count()
         {
             // Filters out loose single tracks that would otherwise look like albums.
-            var releases = Build(Peer("bob", @"Music\Singles\one off.flac"));
+            var releases = Build(Peer("bob", @"Music\Singles\one off.mp3"));
 
             releases.Should().BeEmpty();
         }
@@ -124,10 +124,49 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         public void should_ignore_non_audio_files()
         {
             var releases = Build(Peer("bob",
-                @"Music\WYWH\01.flac",
-                @"Music\WYWH\02.flac",
+                @"Music\WYWH\01.mp3",
+                @"Music\WYWH\02.mp3",
                 @"Music\WYWH\cover.jpg",
                 @"Music\WYWH\notes.txt"));
+
+            releases.Should().HaveCount(1);
+            releases[0].Size.Should().Be(2000);
+        }
+
+        [Test]
+        public void should_not_allow_flac_by_default()
+        {
+            // flac is a music format in practice; allowing it made a title search return albums and
+            // soundtracks that merely share a name with the book.
+            var releases = Build(Peer("bob",
+                @"Music\WYWH\01.flac",
+                @"Music\WYWH\02.flac"));
+
+            releases.Should().BeEmpty();
+        }
+
+        [Test]
+        public void should_prefer_the_single_file_audiobook_when_a_folder_also_shares_mp3_parts()
+        {
+            _settings.MinimumFileCount = 1;
+
+            var releases = Build(Peer("bob",
+                @"Audiobooks\Dune\Dune.m4b",
+                @"Audiobooks\Dune\01 - Chapter 1.mp3",
+                @"Audiobooks\Dune\02 - Chapter 2.mp3"));
+
+            releases.Should().HaveCount(1);
+            releases[0].Size.Should().Be(1000);
+            releases[0].Title.Should().EndWith("[M4B]");
+            SlskdReleaseLocator.FromDownloadUrl(releases[0].DownloadUrl).Files.Should().HaveCount(1);
+        }
+
+        [Test]
+        public void should_keep_mp3_parts_when_the_folder_has_no_single_file_audiobook()
+        {
+            var releases = Build(Peer("bob",
+                @"Audiobooks\Dune\01 - Chapter 1.mp3",
+                @"Audiobooks\Dune\02 - Chapter 2.mp3"));
 
             releases.Should().HaveCount(1);
             releases[0].Size.Should().Be(2000);
@@ -138,7 +177,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         {
             _settings.MaximumQueueLength = 5;
 
-            var response = Peer("bob", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac");
+            var response = Peer("bob", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3");
             response.QueueLength = 50;
 
             Build(response).Should().BeEmpty();
@@ -147,7 +186,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         [Test]
         public void should_exclude_locked_files_by_default()
         {
-            var response = Peer("bob", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac");
+            var response = Peer("bob", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3");
             response.Files.ForEach(f => f.IsLocked = true);
 
             Build(response).Should().BeEmpty();
@@ -156,7 +195,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         [Test]
         public void should_round_trip_the_locator_through_the_download_url()
         {
-            var releases = Build(Peer("bob", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac"));
+            var releases = Build(Peer("bob", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3"));
 
             var locator = SlskdReleaseLocator.FromDownloadUrl(releases[0].DownloadUrl);
 
@@ -176,7 +215,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         [Test]
         public void should_prefix_artist_when_folder_name_lacks_it()
         {
-            var releases = Build(Peer("bob", @"Music\Wish You Were Here\01.flac", @"Music\Wish You Were Here\02.flac"));
+            var releases = Build(Peer("bob", @"Music\Wish You Were Here\01.mp3", @"Music\Wish You Were Here\02.mp3"));
 
             releases[0].Title.Should().StartWith("Pink Floyd - Wish You Were Here");
         }
@@ -184,7 +223,7 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         [Test]
         public void should_not_duplicate_artist_already_in_folder_name()
         {
-            var releases = Build(Peer("bob", @"Music\Pink Floyd - Animals\01.flac", @"Music\Pink Floyd - Animals\02.flac"));
+            var releases = Build(Peer("bob", @"Music\Pink Floyd - Animals\01.mp3", @"Music\Pink Floyd - Animals\02.mp3"));
 
             releases[0].Title.Should().StartWith("Pink Floyd - Animals");
             releases[0].Title.ToLowerInvariant().IndexOf("pink floyd").Should().Be(releases[0].Title.ToLowerInvariant().LastIndexOf("pink floyd"));
@@ -193,9 +232,9 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         [Test]
         public void should_tag_title_with_the_file_format()
         {
-            var releases = Build(Peer("bob", @"Music\WYWH\01.flac", @"Music\WYWH\02.flac"));
+            var releases = Build(Peer("bob", @"Music\WYWH\01.mp3", @"Music\WYWH\02.mp3"));
 
-            releases[0].Title.Should().EndWith("[FLAC]");
+            releases[0].Title.Should().EndWith("[MP3]");
         }
     }
 }
