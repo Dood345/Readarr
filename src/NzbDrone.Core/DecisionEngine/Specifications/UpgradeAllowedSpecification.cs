@@ -1,5 +1,6 @@
 using System.Linq;
 using NLog;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
@@ -28,14 +29,12 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
         {
             var qualityProfile = subject.Author.QualityProfile.Value;
 
-            foreach (var file in subject.Books.SelectMany(b => b.BookFiles.Value))
-            {
-                if (file == null)
-                {
-                    _logger.Debug("File is no longer available, skipping this file.");
-                    continue;
-                }
+            // An ebook and an audiobook of the same book coexist; only files of the release's own
+            // media type can block it as a disallowed upgrade.
+            var mediaType = subject.ParsedBookInfo.Quality.Quality.MediaType();
 
+            foreach (var file in subject.Books.SelectMany(b => b.BookFiles.Value.OfMediaType(mediaType)))
+            {
                 var fileCustomFormats = _formatService.ParseCustomFormat(file, subject.Author);
                 _logger.Debug("Comparing file quality with report. Existing files contain {0}", file.Quality);
 

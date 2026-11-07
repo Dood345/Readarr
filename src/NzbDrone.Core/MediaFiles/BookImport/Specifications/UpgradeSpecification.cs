@@ -1,5 +1,6 @@
 using System.Linq;
 using NLog;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.DecisionEngine;
@@ -26,7 +27,9 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Specifications
 
         public Decision IsSatisfiedBy(LocalBook item, DownloadClientItem downloadClientItem)
         {
-            var files = item.Book?.BookFiles?.Value;
+            // An incoming m4b is only measured against existing audio files and an incoming epub
+            // against existing text files; the other media type coexists rather than competes.
+            var files = item.Book?.BookFiles?.Value.OfMediaType(item.Quality.Quality.MediaType());
             if (files == null || !files.Any())
             {
                 // No existing books, skip.  This guards against new authors not having a QualityProfile.

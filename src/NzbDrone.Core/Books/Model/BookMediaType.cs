@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Qualities;
 
 namespace NzbDrone.Core.Books
@@ -32,6 +33,26 @@ namespace NzbDrone.Core.Books
             return quality != null && quality.Id >= FirstAudioQualityId
                 ? BookMediaType.Audiobook
                 : BookMediaType.Ebook;
+        }
+
+        /// <summary>
+        /// The media type of a file on disk, read from its quality. A file's quality always exists
+        /// once it has been identified, whereas its edition is a lazy load, so this is the cheap
+        /// and reliable way to tell an m4b from an epub.
+        /// </summary>
+        public static BookMediaType MediaType(this BookFile bookFile)
+        {
+            return bookFile?.Quality?.Quality.MediaType() ?? BookMediaType.Ebook;
+        }
+
+        /// <summary>
+        /// The files that compete with a new file of the given media type. An ebook and an
+        /// audiobook of the same book coexist rather than upgrade each other, so quality
+        /// comparisons and upgrades only ever look at files of the same type.
+        /// </summary>
+        public static List<BookFile> OfMediaType(this IEnumerable<BookFile> bookFiles, BookMediaType mediaType)
+        {
+            return bookFiles?.Where(x => x != null && x.MediaType() == mediaType).ToList() ?? new List<BookFile>();
         }
 
         /// <summary>

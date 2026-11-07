@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NLog;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.Configuration;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download.TrackedDownloads;
@@ -52,6 +53,13 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 // Failed items (already searching for a replacement) won't be part of the queue since
                 // it's a copy, of the tracked download, not a reference.
                 if (queueItem.TrackedDownloadState == TrackedDownloadState.DownloadFailedPending)
+                {
+                    continue;
+                }
+
+                // A queued ebook and a queued audiobook of the same book are both wanted; only a
+                // queued release of the same media type can make this one redundant.
+                if (remoteBook.ParsedBookInfo.Quality.Quality.MediaType() != subject.ParsedBookInfo.Quality.Quality.MediaType())
                 {
                     continue;
                 }

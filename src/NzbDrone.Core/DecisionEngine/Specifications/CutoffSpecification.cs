@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NLog;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.Books;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
@@ -31,7 +32,11 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
         {
             var qualityProfile = subject.Author.QualityProfile.Value;
 
-            foreach (var file in subject.Books.SelectMany(b => b.BookFiles.Value))
+            // The cutoff is per media type, so an existing epub at its text cutoff says nothing
+            // about whether an audiobook release is wanted, and vice versa.
+            var mediaType = subject.ParsedBookInfo.Quality.Quality.MediaType();
+
+            foreach (var file in subject.Books.SelectMany(b => b.BookFiles.Value.OfMediaType(mediaType)))
             {
                 // Get a distinct list of all current track qualities for a given book
                 var currentQualities = new List<QualityModel> { file.Quality };
@@ -47,7 +52,7 @@ namespace NzbDrone.Core.DecisionEngine.Specifications
                 {
                     _logger.Debug("Cutoff already met by existing files, rejecting.");
 
-                    var qualityCutoffIndex = qualityProfile.GetIndex(qualityProfile.Cutoff);
+                    var qualityCutoffIndex = qualityProfile.GetIndex(qualityProfile.EffectiveCutoffFor(mediaType));
                     var qualityCutoff = qualityProfile.Items[qualityCutoffIndex.Index];
 
                     return Decision.Reject("Existing files meets cutoff: {0}", qualityCutoff);
