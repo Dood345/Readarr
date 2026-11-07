@@ -214,6 +214,35 @@ author, so both formats share cutoff and quality rules.
 Do not mass-rename without a preview run; three existing top-level folders are raw release names and
 will need manual author assignment first.
 
+## Audiobooks for Audiobookshelf over slskd (2026-11-06)
+
+Branch `feature/audiobook-abs-fixes`. Found after three months of real use (DB and log evidence
+in the session notes):
+
+- **Upgrades deleted the other media type.** `UpgradeMediaFileService` removed every file of the
+  book, and the import/grab specifications compared against every file, so an m4b "upgraded" and
+  permanently deleted the epub of the same book (and a same-quality m4b replaced the previous
+  one). Fixed by scoping all of it to the media type (`BookFiles.OfMediaType`) and resolving the
+  profile cutoff per type (`QualityProfile.CutoffFor`).
+- **Renaming was off**, so imports landed loose in the author folder and ABS merged the author
+  into one book. `RenameBooks` now defaults to on; migration 043 switches existing installs.
+  Run Preview Rename → Organise on affected authors after deploying.
+- **Nothing was ever grabbed automatically**: RSS sync is the only scheduled indexer task and
+  slskd has no feed. `MissingBookSearchCommand` is now scheduled (`MissingBookSearchInterval`,
+  default 24 h, Settings → Indexers). The other blocker was every author sitting on the
+  "eBook" profile, which disallows M4B/MP3: migration 044 adds an "eBook + Audiobook" profile;
+  move authors onto it (Author → Edit, or Mass Editor).
+- slskd indexer: `flac` dropped from the default extensions (music), and a folder that offers an
+  m4b next to mp3 chapter parts now yields only the m4b.
+- `SixLabors.ImageSharp` 3.1.12 → 3.2.0: six new advisories made `TreatWarningsAsErrors` fail
+  the build outright, so the image could not be rebuilt at all. The Lidarr fork pins the same
+  version and needs the same bump.
+
+Still open: the `Slskd` download client adopts every finished slskd folder (hardcoded
+`Category = "Readarr"`), including Lidarr/soularr music — 300+ failed import attempts in
+`DownloadHistory`. Download ids use `string.GetHashCode()`, which changes per process on .NET, so
+history links break across restarts. Both are in the sibling Lidarr fork too.
+
 ## Podcasts: resolved
 
 Moved `S:\My Books\podcast` to `S:\Podcasts` (110 files, 7.3 GB, 8 shows) and mounted it into

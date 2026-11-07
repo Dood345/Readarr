@@ -158,7 +158,8 @@ and behave exactly as in Lidarr:
 - **Data**: Dapper over SQLite (default) **or** Postgres — both must keep working.
   `BasicRepository<TModel>`, `TableMapping.cs`, `WhereBuilderSqlite`/`WhereBuilderPostgres`.
   Migrations are FluentMigrator in `src/NzbDrone.Core/Datastore/Migration/`, `NNN_snake_case.cs`
-  with `[Migration(NNN)]`. Currently 41 migrations, highest **040**. Always add the next number;
+  with `[Migration(NNN)]`. Highest is **044** (043 turns renaming on, 044 seeds the
+  "eBook + Audiobook" profile). Always add the next number;
   never edit an existing migration.
 - **Providers (ThingiProvider)**: indexers, download clients, notifications, import lists and
   metadata consumers are all `IProvider` + `IProviderConfig` + `ProviderDefinition`, discovered by
@@ -202,6 +203,24 @@ Notes that are easy to get wrong:
   audiobook data" rather than failing a lookup.
 - `IProvideSeriesInfo`/`IProvideListInfo` are *not* part of this path — they belong to the Goodreads
   import lists and are implemented by `GoodreadsProxy`.
+
+### Media types and upgrades
+
+A book may monitor one edition per `BookMediaType` (ebook, audiobook), and **quality comparisons
+stay inside a media type**. `UpgradeMediaFileService`, the import `UpgradeSpecification` and the
+grab-side `UpgradeDisk`/`UpgradeAllowed`/`Cutoff` specifications all filter existing files with
+`BookFiles.OfMediaType(...)` before comparing, so an m4b never replaces or blocks an epub. A
+profile's single `Cutoff` belongs to one type; `QualityProfile.CutoffFor(mediaType)` substitutes
+the best allowed quality of the other type (see `EffectiveCutoffFor`). Anything new that compares
+a release or file against `Book.BookFiles` must do the same, or the upgrade path silently deletes
+the other format again (History reason `Upgrade`, 2026-10-30, is what that looked like).
+
+`NamingConfig.Default.RenameBooks` is `true`: the book folder only exists inside
+`StandardBookFormat`, so with renaming off every import lands loose in the author folder and
+Audiobookshelf merges an author's catalogue into one item.
+
+Soulseek has no RSS. `MissingBookSearchCommand` is on the scheduler (`MissingBookSearchInterval`,
+hours, Settings → Indexers) because nothing on slskd is ever found otherwise.
 
 ### API controllers
 
