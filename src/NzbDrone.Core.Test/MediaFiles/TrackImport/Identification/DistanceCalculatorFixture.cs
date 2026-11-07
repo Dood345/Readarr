@@ -11,23 +11,24 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
     [TestFixture]
     public class DistanceCalculatorFixture : TestBase
     {
-        private static Edition EditionOf(string title, bool isEbook)
+        private static Edition EditionOf(string title, bool isEbook, string bookTitle = null, string isbn = null)
         {
             return new Edition
             {
                 Title = title,
                 IsEbook = isEbook,
+                Isbn13 = isbn,
                 Format = isEbook ? "ebook" : "Audiobook",
                 Book = new Book
                 {
-                    Title = title,
+                    Title = bookTitle ?? title,
                     AuthorMetadata = new AuthorMetadata { Name = "Frank Herbert" },
                     SeriesLinks = new List<SeriesBookLink>()
                 }
             };
         }
 
-        private static List<LocalBook> FileOf(string path)
+        private static List<LocalBook> FileOf(string path, string title = "Dune Messiah", string isbn = null)
         {
             return new List<LocalBook>
             {
@@ -37,10 +38,62 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
                     FileTrackInfo = new ParsedTrackInfo
                     {
                         Authors = new List<string> { "Frank Herbert" },
-                        BookTitle = "Dune Messiah"
+                        BookTitle = title,
+                        Isbn = isbn
                     }
                 }
             };
+        }
+
+        [Test]
+        public void a_tag_with_the_series_prefixed_should_match_the_edition_whose_segments_contain_it()
+        {
+            // Regression: "Dune: House Atreides (Unabridged)" scored worse against
+            // "Dune: House Atreides: House Trilogy, Book 1" than against "Dune: House Corrino",
+            // because only the whole edition title was compared.
+            var file = FileOf(@"C:\books\Brian Herbert\House Atreides.m4a".AsOsAgnostic(), "Dune: House Atreides (Unabridged)");
+
+            var right = DistanceCalculator.BookDistance(file, EditionOf("Dune: House Atreides: House Trilogy, Book 1", false, "House Atreides")).NormalizedDistance();
+            var wrong = DistanceCalculator.BookDistance(file, EditionOf("Dune: House Corrino", false, "Dune House Corrino")).NormalizedDistance();
+
+            right.Should().BeLessThan(wrong);
+        }
+
+        [Test]
+        public void a_long_subtitled_tag_should_match_the_work_named_by_its_title_part()
+        {
+            var file = FileOf(
+                @"C:\books\Howard-Pitney\mlk.epub".AsOsAgnostic(),
+                "Martin Luther King Jr., Malcolm X, and the Civil Rights Struggle of the 1950s and 1960s: A Brief History with Documents");
+
+            var right = DistanceCalculator.BookDistance(file, EditionOf("Martin Luther King, Jr., Malcolm X, and the Civil Rights Struggle of the 1950S and 1960S", true)).NormalizedDistance();
+            var omnibus = DistanceCalculator.BookDistance(file, EditionOf("Reading the American Past 3E V2 & Martin Luther King, Jr., Malcolm X, and the Civil Rights Struggle of the 1950S & Women's Magazines", true)).NormalizedDistance();
+
+            right.Should().BeLessThan(omnibus);
+        }
+
+        [Test]
+        public void a_differing_isbn_should_not_outweigh_an_exact_title()
+        {
+            // Regression: "Master of the Game" with a 2012 ISBN lost to "Easter Parade", which has
+            // no ISBN at all, because a differing ISBN weighed more than the whole title.
+            var file = FileOf(@"C:\books\Sidney Sheldon\Master of the Game.epub".AsOsAgnostic(), "Master of the Game", "9780062015587");
+
+            var right = DistanceCalculator.BookDistance(file, EditionOf("Master of the Game", true, isbn: "9780007777754")).NormalizedDistance();
+            var wrong = DistanceCalculator.BookDistance(file, EditionOf("Easter Parade", true)).NormalizedDistance();
+
+            right.Should().BeLessThan(wrong);
+        }
+
+        [Test]
+        public void a_matching_isbn_should_still_beat_the_same_title_with_a_different_one()
+        {
+            var file = FileOf(@"C:\books\Sidney Sheldon\Master of the Game.epub".AsOsAgnostic(), "Master of the Game", "9780062015587");
+
+            var matching = DistanceCalculator.BookDistance(file, EditionOf("Master of the Game", true, isbn: "9780062015587")).NormalizedDistance();
+            var differing = DistanceCalculator.BookDistance(file, EditionOf("Master of the Game", true, isbn: "9780007777754")).NormalizedDistance();
+
+            matching.Should().BeLessThan(differing);
         }
 
         [Test]
