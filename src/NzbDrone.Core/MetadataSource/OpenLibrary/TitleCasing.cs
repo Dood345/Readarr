@@ -62,7 +62,9 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
                     continue;
                 }
 
-                if (letters.Any(char.IsUpper))
+                // Only a word that opens with a letter is capitalised: "1950s", "20th" and "3rd"
+                // would otherwise come out as "1950S", "20Th" and "3Rd".
+                if (letters.Any(char.IsUpper) || !char.IsLetter(word.First(c => char.IsLetterOrDigit(c))))
                 {
                     continue;
                 }
