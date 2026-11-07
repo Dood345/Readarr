@@ -260,10 +260,43 @@ in Readarr, but a dozen sat on the wrong book or edition):
 - Renaming a 1,310-file untagged Tolkien rip to "The Hobbit (2).mp3" would have lost every chapter
   name in Audiobookshelf. `KeepPartFileNames` (default on) keeps multi-part file names.
 
-Still open: the `Slskd` download client adopts every finished slskd folder (hardcoded
-`Category = "Readarr"`), including Lidarr/soularr music — 300+ failed import attempts in
-`DownloadHistory`. Download ids use `string.GetHashCode()`, which changes per process on .NET, so
-history links break across restarts. Both are in the sibling Lidarr fork too.
+Found while re-identifying the real library with `RescanFolders filter=none` (each one cost a
+rebuild, so they are worth knowing):
+
+- A candidate edition's existing files joined the comparison from *any* folder, so an edition
+  holding 22 chapter files outvoted a single m4b's own tags and absorbed it. Now same-folder only.
+- A candidate carried every file of its *book*, and `PopulateMatch` folded them into the release,
+  so the epub's identification produced a second decision for the m4b in the same folder pointing
+  at the ebook edition. Candidates carry only their own edition's files and existing files only
+  inform the distance.
+- Two decisions for one path made `ImportApprovedBooks` delete the old records and then fail the
+  insert on the unique index, which dropped 21 files from the database (not from disk). Existing
+  files are reduced to one decision per path.
+- `SameFileSpecification` rejected every already-imported file, so a rescan could never move a
+  file to the right edition. An existing file that now identifies as another edition of its book
+  is let through; only its record changes.
+- ISBN mismatch weighed 10 against the title's 3, so "Master of the Game" lost to "Easter
+  Parade" (no ISBN). Now 1.0; a match still pulls hard.
+- Audible edition titles ("Dune: House Atreides: House Trilogy, Book 1") are offered as leading
+  segment runs, second segment and work title; file tags are split the same way.
+
+Final state of `S:\My Books` after Readarr's own rename: every author folder holds one folder per
+title (`Author/Title/Author - Title.ext`, chapter files keep their names), ebook and audiobook of a
+book share a folder, every media file is on the edition of its own type. Leftover
+`cover.jpg`/`metadata.json` were moved into the new folders by hand (Readarr does not track
+foreign extras).
+
+Round 3 (P3): the `Slskd` download client only adopts an ungrabbed folder when
+`ImportUngrabbedDownloads` is on and the folder holds a file in `BookExtensions`
+(default `epub,mobi,azw3,pdf,m4b,m4a`), so Lidarr/soularr music in the shared `/downloads/music`
+no longer triggers an import attempt (300+ failed ones in two months). Download ids come from
+`SlskdIds.ForDownload` (SHA-1 of peer + folder) instead of `string.GetHashCode()`, which .NET
+randomises per process. **Both bugs are still in the sibling Lidarr fork** (`../Liedarr`,
+`Download/Clients/Slskd/Slskd.cs`, `Indexers/Slskd/SlskdIndexer.cs`) and port with renames.
+
+Open: Audible lists Harry Potter under the US titles, so those books have no audiobook edition and
+their mp3s sit on the text editions; a per-book Audible title search as a fallback would fix it.
+`.mobi` duplicates of epubs stay unmapped by design (lower text quality); Trudi Canavan has four.
 
 ## Podcasts: resolved
 

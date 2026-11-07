@@ -234,6 +234,12 @@ variants ("Dune: The Butlerian Jihad" ≡ "The Butlerian Jihad" ≡ "Dune Butler
 Soulseek has no RSS. `MissingBookSearchCommand` is on the scheduler (`MissingBookSearchInterval`,
 hours, Settings → Indexers) because nothing on slskd is ever found otherwise.
 
+The `Slskd` download client sees every transfer in the daemon, and `/downloads/music` is shared
+with Lidarr. A folder Readarr did not grab is only offered for import (non-empty `Category`) when
+`ImportUngrabbedDownloads` is on and `Slskd.ShouldAdopt` finds a `BookExtensions` file in it.
+Download ids and release guids come from `SlskdIds.ForDownload` — never `string.GetHashCode()`,
+which .NET randomises per process.
+
 ### API controllers
 
 **POST/PUT actions must carry `[FromBody]` explicitly.** `V1ApiControllerAttribute` implements
