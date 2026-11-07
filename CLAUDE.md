@@ -247,8 +247,21 @@ searched title inside the release name and forced it. Bare numbers ("<Series> 2"
 ("2 <Series> Books") deliberately do not count. Audible-style "Title: Series, Book N" is the normal
 slskd audiobook folder name, so this rule fires constantly.
 
-Soulseek has no RSS. `MissingBookSearchCommand` is on the scheduler (`MissingBookSearchInterval`,
-hours, Settings → Indexers) because nothing on slskd is ever found otherwise.
+Soulseek has no RSS. `MissingBookSearchCommand` **and** `CutoffUnmetBookSearchCommand` are on the
+scheduler (both at `MissingBookSearchInterval`, hours, Settings → Indexers) because nothing on slskd
+is ever found otherwise.
+
+**Bitrate is the audiobook "quality" that matters, and it comes from slskd.** Readarr's
+quality-definition size limits are not enforced (`AcceptableSizeSpecification` is stubbed out) and
+size says nothing about a book of unknown length. Soulseek peers report `length` and `bitRate` per
+file, so `SlskdIndexer.EstimateBitrate` sets `ReleaseInfo.Bitrate` (kbps; 120 kbps ≈ 0.9 MB/min)
+and the `Bitrate` custom-format condition matches a kbps range — on the release when grabbing, on
+`MediaInfo.AudioBitrate` of the file when importing or upgrading. The live profile 3 scores
+"Audiobook ~120 kbps" (96–160) at +100 with `CutoffFormatScore` 100, so 64 kbps Audible rips are
+taken when nothing better exists and upgraded later. `BookCutoffService` counts a file below the
+profile's format cutoff as cutoff unmet, but only for the media type the profile's `Cutoff`
+quality belongs to (a bitrate format can never match an epub); for such profiles it pages in
+memory because scores are not in the database.
 
 The `Slskd` download client sees every transfer in the daemon, and `/downloads/music` is shared
 with Lidarr. A folder Readarr did not grab is only offered for import (non-empty `Category`) when
