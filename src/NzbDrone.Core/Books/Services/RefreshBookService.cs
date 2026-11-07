@@ -177,6 +177,11 @@ namespace NzbDrone.Core.Books
 
             remote.UseDbFieldsFrom(local);
 
+            if (local.Title != remote.Title)
+            {
+                _logger.Trace("Title for {0} changes from '{1}' to '{2}'", local.ForeignBookId, local.Title, remote.Title);
+            }
+
             if (local.Title != (remote.Title ?? "Unknown") ||
                 local.ForeignBookId != remote.ForeignBookId ||
                 local.AuthorMetadata.Value.ForeignAuthorId != remote.AuthorMetadata.Value.ForeignAuthorId)
