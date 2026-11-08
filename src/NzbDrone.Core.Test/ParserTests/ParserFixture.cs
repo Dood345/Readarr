@@ -245,6 +245,47 @@ namespace NzbDrone.Core.Test.ParserTests
             parseResult.BookTitle.Should().Be(expectedBook);
         }
 
+        [TestCase("Brian Herbert - 3 House Corrino [M4B]", "House Corrino")]
+        [TestCase("Brian Herbert - Dune - House Corrino [MP3]", "Dune - House Corrino")]
+        [TestCase("Brian Herbert - Dune House Corrino [EPUB]", "Dune House Corrino")]
+        public void should_find_an_edition_title_or_its_segment_with_search_criteria(string report, string expectedBook)
+        {
+            _author.Name = "Brian Herbert";
+            _books.Add(new Book
+            {
+                Title = "Dune House Corrino",
+                Editions = new List<Edition>
+                {
+                    new Edition { Title = "Dune House Corrino", Monitored = true },
+                    new Edition { Title = "Dune: House Corrino" }
+                }
+            });
+
+            var parseResult = Parser.Parser.ParseBookTitleWithSearchCriteria(report, _author, _books);
+
+            parseResult.Should().NotBeNull();
+            parseResult.BookTitle.Should().Be(expectedBook);
+        }
+
+        [Test]
+        public void should_list_work_and_edition_titles_and_their_segments_longest_first()
+        {
+            var book = new Book
+            {
+                Title = "House Atreides",
+                Editions = new List<Edition>
+                {
+                    new Edition { Title = "Dune: House Atreides: House Trilogy, Book 1" },
+                    new Edition { Title = "House Atreides" }
+                }
+            };
+
+            // "house trilogy book 1" is a series designation, and "house atreides" duplicates the work title
+            Parser.Parser.BookTitleCandidates(book).Should().Equal(
+                "Dune: House Atreides: House Trilogy, Book 1",
+                "House Atreides");
+        }
+
         [TestCase("Ed Sheeran", "I See Fire", "Ed Sheeran I See Fire[Mimp3.eu].mp3 FLAC")]
         [TestCase("Ed Sheeran", "Divide", "Ed Sheeran   ? Divide FLAC")]
         [TestCase("Ed Sheeran", "+", "Ed Sheeran + FLAC")]

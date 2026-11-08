@@ -133,6 +133,19 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
         }
 
         [Test]
+        public void should_map_an_edition_title_segment_found_by_the_search_criteria_parser_to_the_searched_book()
+        {
+            var corrino = GivenBook(3, "Dune House Corrino");
+            corrino.Editions.Value.Add(new Edition { Title = "Dune: House Corrino" });
+            var criteria = new BookSearchCriteria { Author = _author, Books = new List<Book> { corrino } };
+
+            var parsed = Parser.Parser.ParseBookTitleWithSearchCriteria("Brian Herbert - 3 House Corrino [M4B]", new Author { Name = "Brian Herbert", AuthorMetadataId = 7 }, criteria.Books);
+            parsed.BookTitle.Should().Be("House Corrino");
+
+            Subject.GetBooks(parsed, _author, criteria).Should().BeEquivalentTo(new List<Book> { corrino });
+        }
+
+        [Test]
         public void should_not_consult_series_when_the_author_has_none()
         {
             Mocker.GetMock<ISeriesService>()

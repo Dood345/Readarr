@@ -7,6 +7,7 @@ using NLog;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Instrumentation;
 using NzbDrone.Core.Books;
+using NzbDrone.Core.MetadataSource;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.Parser
@@ -205,6 +206,8 @@ namespace NzbDrone.Core.Parser
                                                                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly HashSet<char> WordDelimiters = new HashSet<char>(" .,_-=()[]|\"`'’");
+
+        private static readonly Regex SeriesDesignationRegex = new Regex(@"\b(?:book|vol|volume|part|no)\s*\d+(?:\.\d+)?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex WordDelimiterRegex = new Regex(@"(\s|\.|,|_|-|=|\(|\)|\[|\]|\|)+", RegexOptions.Compiled);
         private static readonly Regex PunctuationRegex = new Regex(@"[^\w\s]", RegexOptions.Compiled);
         private static readonly Regex CommonWordRegex = new Regex(@"\b(a|an|the|and|or|of)\b\s?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -355,11 +358,11 @@ namespace NzbDrone.Core.Parser
 
                 simpleTitle = CleanTorrentSuffixRegex.Replace(simpleTitle);
 
-                var bestBook = books
+                var bestBookEntity = books
                     .OrderByDescending(x => simpleTitle.FuzzyMatch(x.Editions.Value.PrimaryEdition().Title, wordDelimiters: WordDelimiters))
-                    .First()
-                    .Editions.Value
-                    .PrimaryEdition();
+                    .First();
+
+                var bestBook = bestBookEntity.Editions.Value.PrimaryEdition();
 
                 var foundAuthor = GetTitleFuzzy(simpleTitle, authorName, out var remainder);
 
@@ -373,6 +376,21 @@ namespace NzbDrone.Core.Parser
                 if (foundBook == null)
                 {
                     foundBook = GetTitleFuzzy(remainder, bestBook.Title.SplitBookTitle(authorName).Item1, out _);
+                }
+
+                if (foundBook == null)
+                {
+                    // Releases are named after some edition, not necessarily the work: "Dune House
+                    // Corrino" is shared as "3 House Corrino" and "Dune - House Corrino".
+                    foreach (var alternate in BookTitleCandidates(bestBookEntity).Where(t => !t.Equals(bestBook.Title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        foundBook = GetTitleFuzzy(remainder, alternate, out _);
+
+                        if (foundBook != null)
+                        {
+                            break;
+                        }
+                    }
                 }
 
                 Logger.Trace($"Found {foundAuthor} - {foundBook} with fuzzy parser");
@@ -416,6 +434,41 @@ namespace NzbDrone.Core.Parser
 
             Logger.Debug("Unable to parse {0}", title);
             return null;
+        }
+
+        /// <summary>
+        /// Every name a release might carry for a book: the work title, each edition title, and the
+        /// colon-separated segments of those with at least two words ("Dune: House Corrino" gives
+        /// "house corrino"). Series designations such as "house trilogy book 1" are left out.
+        /// Longest first, so the most specific name is tried before a bare segment.
+        /// </summary>
+        public static List<string> BookTitleCandidates(Book book)
+        {
+            var titles = new List<string> { book.Title };
+
+            if (book.Editions?.Value != null)
+            {
+                titles.AddRange(book.Editions.Value.Select(e => e.Title));
+            }
+
+            var candidates = new List<string>();
+
+            foreach (var title in titles.Where(t => t.IsNotNullOrWhiteSpace()))
+            {
+                candidates.Add(title);
+
+                var segments = TitleNormalizer.Segments(title);
+
+                if (segments.Count > 1)
+                {
+                    candidates.AddRange(segments.Where(x => TitleNormalizer.WordCount(x) >= 2 && !SeriesDesignationRegex.IsMatch(x)));
+                }
+            }
+
+            return candidates
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(x => x.Length)
+                .ToList();
         }
 
         public static string GetTitleFuzzy(string report, string name, out string remainder)

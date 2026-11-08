@@ -140,6 +140,12 @@ namespace NzbDrone.Core.Parser
             {
                 var cleanTitle = Parser.CleanAuthorName(parsedBookInfo.BookTitle);
                 bookInfo = searchCriteria.Books.ExclusiveOrDefault(e => e.Title == bookTitle || e.CleanTitle == cleanTitle);
+
+                // The search-criteria parser may have found an edition title or a segment of one
+                if (bookInfo == null)
+                {
+                    bookInfo = searchCriteria.Books.ExclusiveOrDefault(e => Parser.BookTitleCandidates(e).Any(t => Parser.CleanAuthorName(t) == cleanTitle));
+                }
             }
 
             if (bookInfo == null)
