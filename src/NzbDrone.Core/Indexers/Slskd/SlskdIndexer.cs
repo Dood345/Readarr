@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentValidation.Results;
@@ -122,6 +123,11 @@ namespace NzbDrone.Core.Indexers.Slskd
                         continue;
                     }
 
+                    if (IsCollectionOfBooks(files))
+                    {
+                        continue;
+                    }
+
                     releases.Add(BuildRelease(response, group.Key, files, artistName));
                 }
             }
@@ -165,6 +171,28 @@ namespace NzbDrone.Core.Indexers.Slskd
                 PublishDate = DateTime.UtcNow,
                 DownloadProtocol = nameof(SoulseekDownloadProtocol)
             };
+        }
+
+        /// <summary>
+        /// A folder sharing several single-file audiobooks with different names ("1965 - Dune.m4b",
+        /// "1969 - Dune Messiah.m4b") is a shelf, not a book. Mapped to whichever title the parser
+        /// finds first, the whole shelf would be grabbed and imported as one book. Files whose names
+        /// differ only in digits ("Dune Part 1.m4b", "Dune Part 2.m4b") are parts of one book and
+        /// are kept.
+        /// </summary>
+        internal static bool IsCollectionOfBooks(List<SlskdFile> files)
+        {
+            var containers = files.Where(f => SingleFileAudiobookExtensions.Contains(GetExtension(f.Filename))).ToList();
+
+            if (containers.Count < 2)
+            {
+                return false;
+            }
+
+            return containers
+                .Select(f => Regex.Replace(GetLeafName(f.Filename), @"[\d\W_]+", string.Empty).ToLowerInvariant())
+                .Distinct()
+                .Count() > 1;
         }
 
         /// <summary>

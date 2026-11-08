@@ -162,6 +162,32 @@ namespace NzbDrone.Core.Test.IndexerTests.SlskdTests
         }
 
         [Test]
+        public void should_skip_a_folder_that_is_a_shelf_of_different_audiobooks()
+        {
+            _settings.MinimumFileCount = 1;
+
+            var releases = Build(Peer("bob",
+                @"Audiobooks\Dune - Frank Herbert\1965 - Dune.m4b",
+                @"Audiobooks\Dune - Frank Herbert\1969 - Dune Messiah.m4b",
+                @"Audiobooks\Dune - Frank Herbert\1976 - Children of Dune.m4b"));
+
+            releases.Should().BeEmpty();
+        }
+
+        [Test]
+        public void should_keep_a_folder_whose_audiobook_files_are_numbered_parts_of_one_book()
+        {
+            _settings.MinimumFileCount = 1;
+
+            var releases = Build(Peer("bob",
+                @"Audiobooks\Dune\Dune - Part 1.m4b",
+                @"Audiobooks\Dune\Dune - Part 2.m4b"));
+
+            releases.Should().HaveCount(1);
+            releases[0].Size.Should().Be(2000);
+        }
+
+        [Test]
         public void should_keep_mp3_parts_when_the_folder_has_no_single_file_audiobook()
         {
             var releases = Build(Peer("bob",
