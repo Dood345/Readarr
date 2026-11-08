@@ -210,6 +210,21 @@ Notes that are easy to get wrong:
   the fork owner's best effort, not ground truth. `refresh-corpus.sh` regenerates the payloads.
 - **Audible is an undocumented app API.** All enrichment is best-effort and must degrade to "no
   audiobook data" rather than failing a lookup.
+- **Author portraits have three sources, tried in order** (`OpenLibraryProvider.EnsureAuthorImage`).
+  Open Library has a `photos` array for under half of a typical library's authors (10 of 21 had
+  none, and `/a/olid/<OLID>-L.jpg?default=false` 404s for every one of them, so there is no
+  key-based fallback to be had). When it has none, the Audible author portrait is fetched through
+  Audnexus (`api.audnex.us/authors/<ASIN>`, the service Audiobookshelf uses; `AudnexusProxy`), with
+  the ASIN taken from the credited author that `AudibleAuthorMatcher` says *is* the author — every
+  Brian Herbert product credits Kevin J. Anderson equally often, so frequency alone picks wrong.
+  **Audnexus returns 200 with some record for almost any ASIN** (an unknown one came back as a tube
+  of antiseptic cream), so the returned name is checked before its image is used. Failing that,
+  Wikidata's P18 image is used (`WikidataProxy`), but only via the Wikidata id Open Library records
+  in `remote_ids` — never by name search, which found politicians and actors of the same name and
+  not one extra portrait. The Commons file is fetched as the original under `upload.wikimedia.org`
+  (hashed `/a/ab/File.jpg` path): Commons refuses to upscale and most portraits are narrower than
+  600px, and `MediaCover.Extension` is read from the end of the URL, so `?width=` must not appear.
+  Only one `Poster` is ever added — `MediaCoverService` writes one file per cover type.
 - `IProvideSeriesInfo`/`IProvideListInfo` are *not* part of this path — they belong to the Goodreads
   import lists and are implemented by `GoodreadsProxy`.
 

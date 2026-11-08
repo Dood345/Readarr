@@ -95,6 +95,10 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
         [JsonPropertyName("photos")]
         public List<int> Photos { get; set; }
+
+        /// <summary>Identifiers in other catalogues, e.g. "wikidata" → "Q711137", "viaf", "isni".</summary>
+        [JsonPropertyName("remote_ids")]
+        public Dictionary<string, string> RemoteIds { get; set; }
     }
 
     public class OpenLibrarySearchResponse

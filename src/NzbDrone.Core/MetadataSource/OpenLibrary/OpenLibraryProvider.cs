@@ -9,6 +9,7 @@ using NzbDrone.Core.Books;
 using NzbDrone.Core.Exceptions;
 using NzbDrone.Core.MediaCover;
 using NzbDrone.Core.MetadataSource.Audible;
+using NzbDrone.Core.MetadataSource.Wikidata;
 
 namespace NzbDrone.Core.MetadataSource.OpenLibrary
 {
@@ -78,12 +79,20 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
         private readonly IOpenLibraryProxy _openLibrary;
         private readonly IAudibleProxy _audible;
+        private readonly IAudnexusProxy _audnexus;
+        private readonly IWikidataProxy _wikidata;
         private readonly Logger _logger;
 
-        public OpenLibraryProvider(IOpenLibraryProxy openLibrary, IAudibleProxy audible, Logger logger)
+        public OpenLibraryProvider(IOpenLibraryProxy openLibrary,
+                                   IAudibleProxy audible,
+                                   IAudnexusProxy audnexus,
+                                   IWikidataProxy wikidata,
+                                   Logger logger)
         {
             _openLibrary = openLibrary;
             _audible = audible;
+            _audnexus = audnexus;
+            _wikidata = wikidata;
             _logger = logger;
         }
 
@@ -101,6 +110,8 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
 
             var metadata = MapAuthorMetadata(resource, key);
             var audibleProducts = _audible.SearchByAuthor(metadata.Name, MaxAudibleResults);
+
+            EnsureAuthorImage(metadata, resource, audibleProducts);
 
             var docs = GetEnglishWorks(key, audibleProducts);
             var works = DeduplicateWorks(docs);
@@ -630,6 +641,67 @@ namespace NzbDrone.Core.MetadataSource.OpenLibrary
             metadata.Links.Add(new Links { Url = $"https://openlibrary.org/authors/{key}", Name = "Open Library" });
 
             return metadata;
+        }
+
+        /// <summary>
+        /// Open Library has a photo for few authors - under half of a typical library. When it has
+        /// none, the portrait Audible shows on the author's page (served by Audnexus) is used, and
+        /// failing that the Wikidata image of the entity Open Library itself links the author to.
+        /// Both are best-effort; an author without any of the three simply has no image.
+        /// </summary>
+        private void EnsureAuthorImage(AuthorMetadata metadata, OpenLibraryAuthorResource resource, List<AudibleProductResource> audibleProducts)
+        {
+            if (metadata.Images.Any())
+            {
+                return;
+            }
+
+            var url = AudibleAuthorImage(metadata.Name, audibleProducts) ?? WikidataAuthorImage(resource);
+
+            if (url.IsNotNullOrWhiteSpace())
+            {
+                metadata.Images.Add(new MediaCover.MediaCover
+                {
+                    Url = url,
+                    CoverType = MediaCoverTypes.Poster
+                });
+            }
+        }
+
+        private string AudibleAuthorImage(string authorName, List<AudibleProductResource> audibleProducts)
+        {
+            var asin = AudibleAuthorMatcher.FindAsin(authorName, audibleProducts);
+
+            if (asin == null)
+            {
+                return null;
+            }
+
+            var author = _audnexus.GetAuthor(asin);
+
+            if (author == null || author.Image.IsNullOrWhiteSpace())
+            {
+                return null;
+            }
+
+            // Audnexus answers with some record for nearly any ASIN, so the name has to agree.
+            if (!AudibleAuthorMatcher.NameMatches(authorName, author.Name))
+            {
+                _logger.Debug("Audible author {0} for {1} is '{2}', ignoring its portrait", asin, authorName, author.Name);
+                return null;
+            }
+
+            return author.Image;
+        }
+
+        private string WikidataAuthorImage(OpenLibraryAuthorResource resource)
+        {
+            if (resource.RemoteIds == null || !resource.RemoteIds.TryGetValue("wikidata", out var entityId))
+            {
+                return null;
+            }
+
+            return _wikidata.GetImageUrl(entityId);
         }
 
         private static void ApplyNameForms(AuthorMetadata metadata)
