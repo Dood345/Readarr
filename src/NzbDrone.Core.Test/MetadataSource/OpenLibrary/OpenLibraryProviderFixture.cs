@@ -3,6 +3,7 @@ using FluentAssertions;
 using NUnit.Framework;
 using NzbDrone.Core.MetadataSource.Audible;
 using NzbDrone.Core.MetadataSource.OpenLibrary;
+using NzbDrone.Core.MetadataSource.Wikidata;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common.Categories;
 
@@ -26,6 +27,8 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
 
             Mocker.SetConstant<IOpenLibraryProxy>(Mocker.Resolve<OpenLibraryProxy>());
             Mocker.SetConstant<IAudibleProxy>(Mocker.Resolve<AudibleProxy>());
+            Mocker.SetConstant<IAudnexusProxy>(Mocker.Resolve<AudnexusProxy>());
+            Mocker.SetConstant<IWikidataProxy>(Mocker.Resolve<WikidataProxy>());
         }
 
         [TestCase("OL79034A", "Frank Herbert")]
@@ -40,6 +43,18 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
             author.Metadata.Value.Name.Should().Be(name);
             author.CleanName.Should().NotBeNullOrWhiteSpace();
             author.Books.Value.Should().NotBeEmpty();
+        }
+
+        [Test]
+        public void should_find_a_portrait_for_an_author_open_library_has_no_photo_of()
+        {
+            // Brian Herbert's Open Library record carries no photos array; his portrait comes from
+            // Audible (via Audnexus) or, failing that, Wikidata (Q711137, linked in remote_ids).
+            var author = Subject.GetAuthorInfo("OL1194290A");
+
+            author.Metadata.Value.Images.Should().ContainSingle();
+            author.Metadata.Value.Images[0].Url.Should().NotContain("openlibrary.org");
+            author.Metadata.Value.Images[0].Extension.Should().Be(".jpg");
         }
 
         [Test]
