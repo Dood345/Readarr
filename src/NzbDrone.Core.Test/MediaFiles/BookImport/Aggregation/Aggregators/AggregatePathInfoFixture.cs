@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using FluentAssertions;
+using Moq;
 using NUnit.Framework;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.RootFolders;
 using NzbDrone.Core.Test.Framework;
 using NzbDrone.Test.Common;
 
@@ -12,6 +14,15 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Aggregation.Aggregators
     [TestFixture]
     public class AggregatePathInfoFixture : CoreTest<AggregatePathInfo>
     {
+        [SetUp]
+        public void Setup()
+        {
+            // C:\books is the library; anything else (a download client's folder) is not
+            Mocker.GetMock<IRootFolderService>()
+                .Setup(s => s.GetBestRootFolder(It.Is<string>(p => p.StartsWith(@"C:\books".AsOsAgnostic()))))
+                .Returns(new RootFolder { Path = @"C:\books".AsOsAgnostic() });
+        }
+
         private static LocalBook File(string path, string bookTag = null, string authorTag = null)
         {
             return new LocalBook
@@ -72,6 +83,20 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Aggregation.Aggregators
                 File(@"C:\books\J.K. Rowling\Harry Potter 1 - The Philosopher's Stone\x.mp3", null, "Jim Dale"), false);
 
             track.FileTrackInfo.Authors.Should().BeEquivalentTo("Jim Dale", "J.K. Rowling");
+        }
+
+        [Test]
+        public void should_not_take_the_download_folder_as_the_author_outside_a_root_folder()
+        {
+            // slskd puts a finished download at <share>/<Book>/file, so the "author" folder is the
+            // share itself. Offering "music" as an author made the tag list two entries long, which
+            // stopped the real "Kevin J Anderson, Brian Herbert" entry being split into its authors,
+            // and Hunters of Dune failed to import at 79.1% against the 80% threshold.
+            var track = Subject.Aggregate(
+                File(@"C:\downloads\music\Hunters of Dune\Hunters of Dune.m4b", null, "Kevin J Anderson, Brian Herbert"), false);
+
+            track.FileTrackInfo.Authors.Should().BeEquivalentTo("Kevin J Anderson, Brian Herbert");
+            track.FileTrackInfo.PathBookTitle.Should().Be("Hunters of Dune");
         }
 
         [Test]

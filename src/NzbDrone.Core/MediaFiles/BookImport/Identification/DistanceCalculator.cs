@@ -252,9 +252,14 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Identification
         {
             var authors = new List<string>(fileAuthors);
 
-            if (fileAuthors.Count == 1)
+            // Every entry is split, not only a lone one. A co-authored audiobook is tagged
+            // "Kevin J Anderson, Brian Herbert" and usually has a second entry as well (the
+            // narrator, or a folder name), and the whole list scored 21% away from "Brian Herbert"
+            // while a split would have matched exactly. Splitting only adds variants and the
+            // distance takes the best of them, so nothing that matched before matches worse.
+            foreach (var author in fileAuthors)
             {
-                authors.AddRange(SplitAuthor(fileAuthors[0]));
+                authors.AddRange(SplitAuthor(author).Where(a => !authors.Contains(a)));
             }
 
             foreach (var author in fileAuthors)

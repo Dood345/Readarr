@@ -200,7 +200,7 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
         }
 
         [Test]
-        public void should_not_split_if_multiple_input()
+        public void should_split_every_entry_of_a_multiple_input()
         {
             var input = new List<string>
             {
@@ -210,9 +210,36 @@ namespace NzbDrone.Core.Test.MediaFiles.BookImport.Identification
 
             var authors = DistanceCalculator.GetAuthorVariants(input);
 
-            authors.Should().HaveCount(2);
+            authors.Should().HaveCount(4);
             authors.Should().Contain("First Last");
             authors.Should().Contain("Second Third, Fourth Fifth");
+            authors.Should().Contain("Second Third");
+            authors.Should().Contain("Fourth Fifth");
+        }
+
+        [Test]
+        public void a_co_authored_tag_next_to_a_narrator_should_still_match_the_credited_author()
+        {
+            // Hunters of Dune: tagged "Kevin J Anderson, Brian Herbert" with a second artist entry.
+            // Compared whole against "Brian Herbert" the author alone cost 21% and the file was
+            // rejected at 79.1% against the 80% threshold.
+            var file = new List<LocalBook>
+            {
+                new LocalBook
+                {
+                    Path = @"C:\downloads\music\Hunters of Dune\Hunters of Dune.m4b",
+                    FileTrackInfo = new ParsedTrackInfo
+                    {
+                        Authors = new List<string> { "Kevin J Anderson, Brian Herbert", "Scott Brick" },
+                        BookTitle = "Hunters of Dune"
+                    }
+                }
+            };
+
+            var edition = EditionOf("Hunters of Dune", isEbook: false);
+            edition.Book.Value.AuthorMetadata = new AuthorMetadata { Name = "Brian Herbert" };
+
+            DistanceCalculator.BookDistance(file, edition).NormalizedDistance().Should().BeLessThan(0.1);
         }
     }
 }

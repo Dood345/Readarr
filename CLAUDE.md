@@ -239,6 +239,17 @@ first — because keying on the title before the colon filed every "Dune: X" aud
 folders. Dedup in `OpenLibraryProvider.DeduplicateWorks` also merges series-prefixed and subtitled
 variants ("Dune: The Butlerian Jihad" ≡ "The Butlerian Jihad" ≡ "Dune Butlerian Jihad").
 
+Two import-time rules keep a grabbed audiobook from failing the 80% match threshold on its tags.
+`AggregatePathInfo` offers the *author folder* as an extra author variant only when the file sits
+inside a root folder: a finished download lives at `<client folder>/<Book>/file`, so there the
+"author" folder is the download share ("music"), and a junk second entry used to stop the real one
+being split. `DistanceCalculator.GetAuthorVariants` splits *every* entry into its co-authors
+("Kevin J Anderson, Brian Herbert" → both names), not only a lone one, because audiobook tags
+routinely carry a second entry (the narrator). Hunters of Dune imported at 79.1% before both.
+Separately, soularr calls slskd's "remove completed downloads" on every run, so a Readarr download
+whose import fails vanishes from the queue within minutes and the folder is left orphaned in
+`/downloads/music`; recover it with Manual Import.
+
 Release→book mapping (`ParsingService.GetBooks`) checks the author's series before anything else:
 a release reading "<Series>, Book N" / "<Series> #N" / "Vol N - <Series>" is the book linked at
 position N. Without it, a search for "Dominion of Blades" (book 1, same name as the series) grabbed

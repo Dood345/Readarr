@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.RootFolders;
 
 namespace NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators
 {
@@ -30,6 +31,13 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators
         /// is what distinguishes it from a title that merely contains a dash.
         /// </summary>
         private static readonly Regex SeriesPrefixRegex = new Regex(@"^.*\d[\d.]*\s*-\s*(?<title>.+)$", RegexOptions.Compiled);
+
+        private readonly IRootFolderService _rootFolderService;
+
+        public AggregatePathInfo(IRootFolderService rootFolderService)
+        {
+            _rootFolderService = rootFolderService;
+        }
 
         public LocalBook Aggregate(LocalBook localTrack, bool otherFiles)
         {
@@ -66,9 +74,14 @@ namespace NzbDrone.Core.MediaFiles.BookImport.Aggregation.Aggregators
             // reads "Jim Dale" - and distance scoring takes the best matching variant, so offering
             // the folder alongside the tag can only help. Filling only when empty left those files
             // scoring 60% against an 80% threshold and rejected despite matching the right book.
+            //
+            // Only inside a root folder, though: that is the only place the layout is known to be
+            // <Author>/<Book>. A finished download sits in <client folder>/<Book>, so there the
+            // "author" folder is the download directory - "music", for the slskd share - and a
+            // second, junk author entry stopped the real one being split into its co-authors.
             var authorName = Path.GetFileName(authorFolder);
 
-            if (authorName.IsNotNullOrWhiteSpace())
+            if (authorName.IsNotNullOrWhiteSpace() && _rootFolderService.GetBestRootFolder(localTrack.Path) != null)
             {
                 localTrack.FileTrackInfo.Authors ??= new List<string>();
 
