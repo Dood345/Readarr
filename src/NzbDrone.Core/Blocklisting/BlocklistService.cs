@@ -56,6 +56,17 @@ namespace NzbDrone.Core.Blocklisting
                     .Any(b => SameTorrent(b, torrentInfo));
             }
 
+            // A Soulseek release has no hash and its publish date is the moment it was listed, so the
+            // peer folder (the title) plus indexer and size is its identity. Without this branch a
+            // failed grab fell through to the usenet filter, matched nothing, and was re-grabbed from
+            // the same "File not shared" peer on every search.
+            if (release.DownloadProtocol == nameof(SoulseekDownloadProtocol))
+            {
+                return _blocklistRepository.BlocklistedByTitle(authorId, release.Title)
+                    .Where(b => b.Protocol == nameof(SoulseekDownloadProtocol))
+                    .Any(b => HasSameIndexer(b, release.Indexer) && HasSameSize(b, release.Size));
+            }
+
             return _blocklistRepository.BlocklistedByTitle(authorId, release.Title)
                 .Where(b => b.Protocol == nameof(UsenetDownloadProtocol))
                 .Any(b => SameNzb(b, release));
