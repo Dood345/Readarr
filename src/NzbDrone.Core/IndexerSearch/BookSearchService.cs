@@ -132,6 +132,11 @@ namespace NzbDrone.Core.IndexerSearch
 
             var books = _bookCutoffService.BooksWhereCutoffUnmet(pagingSpec).Records.ToList();
 
+            if (message.AuthorId.HasValue)
+            {
+                books = books.Where(b => b.AuthorId == message.AuthorId.Value).ToList();
+            }
+
             var queue = _queueService.GetQueue().Where(q => q.Book != null).Select(q => q.Book.Id);
             var cutoffUnmet = books.Where(e => !queue.Contains(e.Id)).ToList();
 

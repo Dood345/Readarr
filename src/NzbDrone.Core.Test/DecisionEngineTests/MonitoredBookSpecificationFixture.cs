@@ -6,6 +6,7 @@ using NzbDrone.Core.Books;
 using NzbDrone.Core.DecisionEngine.Specifications.RssSync;
 using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Parser.Model;
+using NzbDrone.Core.Qualities;
 using NzbDrone.Core.Test.Framework;
 
 namespace NzbDrone.Core.Test.DecisionEngineTests
@@ -134,6 +135,61 @@ namespace NzbDrone.Core.Test.DecisionEngineTests
             };
 
             _monitoredBookSpecification.IsSatisfiedBy(_parseResultMulti, null).Accepted.Should().BeFalse();
+        }
+
+        private void GivenEditions(Book book, bool ebookMonitored, bool audioMonitored)
+        {
+            book.Editions = new List<Edition>
+            {
+                new Edition { Id = 1, IsEbook = true, Monitored = ebookMonitored },
+                new Edition { Id = 2, IsEbook = false, Monitored = audioMonitored }
+            };
+        }
+
+        private static RemoteBook WithQuality(RemoteBook remoteBook, Quality quality)
+        {
+            remoteBook.ParsedBookInfo = new ParsedBookInfo { Quality = new QualityModel(quality) };
+            return remoteBook;
+        }
+
+        [Test]
+        public void should_reject_an_ebook_release_when_only_the_audio_edition_is_monitored()
+        {
+            GivenEditions(_firstBook, ebookMonitored: false, audioMonitored: true);
+
+            _monitoredBookSpecification.IsSatisfiedBy(WithQuality(_parseResultSingle, Quality.EPUB), null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_reject_an_audiobook_release_when_only_the_ebook_edition_is_monitored()
+        {
+            GivenEditions(_firstBook, ebookMonitored: true, audioMonitored: false);
+
+            _monitoredBookSpecification.IsSatisfiedBy(WithQuality(_parseResultSingle, Quality.M4B), null).Accepted.Should().BeFalse();
+        }
+
+        [Test]
+        public void should_accept_a_release_whose_media_type_edition_is_monitored()
+        {
+            GivenEditions(_firstBook, ebookMonitored: false, audioMonitored: true);
+
+            _monitoredBookSpecification.IsSatisfiedBy(WithQuality(_parseResultSingle, Quality.M4B), null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_accept_a_release_when_the_book_has_no_edition_of_that_type()
+        {
+            _firstBook.Editions = new List<Edition> { new Edition { Id = 1, IsEbook = true, Monitored = true } };
+
+            _monitoredBookSpecification.IsSatisfiedBy(WithQuality(_parseResultSingle, Quality.MP3), null).Accepted.Should().BeTrue();
+        }
+
+        [Test]
+        public void should_accept_a_release_of_unknown_quality_whatever_the_editions()
+        {
+            GivenEditions(_firstBook, ebookMonitored: false, audioMonitored: true);
+
+            _monitoredBookSpecification.IsSatisfiedBy(WithQuality(_parseResultSingle, Quality.Unknown), null).Accepted.Should().BeTrue();
         }
     }
 }
