@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Common.Serializer;
@@ -14,6 +15,7 @@ namespace NzbDrone.Core.Download.History
         bool DownloadAlreadyImported(string downloadId);
         DownloadHistory GetLatestDownloadHistoryItem(string downloadId);
         DownloadHistory GetLatestGrab(string downloadId);
+        List<DownloadHistory> GetRecentGrabs(int downloadClientId, int count);
     }
 
     public class DownloadHistoryService : IDownloadHistoryService,
@@ -96,6 +98,11 @@ namespace NzbDrone.Core.Download.History
         {
             return _repository.FindByDownloadId(downloadId)
                 .FirstOrDefault(d => d.EventType == DownloadHistoryEventType.DownloadGrabbed);
+        }
+
+        public List<DownloadHistory> GetRecentGrabs(int downloadClientId, int count)
+        {
+            return _repository.FindGrabs(downloadClientId, count);
         }
 
         public void Handle(BookGrabbedEvent message)

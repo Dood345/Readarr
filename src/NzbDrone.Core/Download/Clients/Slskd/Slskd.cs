@@ -8,6 +8,7 @@ using NLog;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.Download.History;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Indexers.Slskd;
 using NzbDrone.Core.Parser.Model;
@@ -18,11 +19,13 @@ namespace NzbDrone.Core.Download.Clients.Slskd
     public class Slskd : DownloadClientBase<SlskdSettings>
     {
         private readonly ISlskdProxy _proxy;
+        private readonly IDownloadHistoryService _downloadHistoryService;
 
         public override string Name => "Slskd";
         public override string Protocol => nameof(SoulseekDownloadProtocol);
 
         public Slskd(ISlskdProxy proxy,
+                     IDownloadHistoryService downloadHistoryService,
                      IConfigService configService,
                      IDiskProvider diskProvider,
                      IRemotePathMappingService remotePathMappingService,
@@ -30,6 +33,7 @@ namespace NzbDrone.Core.Download.Clients.Slskd
             : base(configService, diskProvider, remotePathMappingService, logger)
         {
             _proxy = proxy;
+            _downloadHistoryService = downloadHistoryService;
         }
 
         public override async Task<string> Download(RemoteBook remoteBook, IIndexer indexer)
@@ -63,6 +67,8 @@ namespace NzbDrone.Core.Download.Clients.Slskd
                 yield break;
             }
 
+            var listed = new HashSet<string>();
+
             foreach (var user in transfers)
             {
                 foreach (var directory in user.Directories ?? new List<SlskdTransferDirectory>())
@@ -71,10 +77,101 @@ namespace NzbDrone.Core.Download.Clients.Slskd
 
                     if (item != null)
                     {
+                        listed.Add(item.DownloadId);
                         yield return item;
                     }
                 }
             }
+
+            foreach (var item in GetForgottenItems(listed))
+            {
+                yield return item;
+            }
+        }
+
+        /// <summary>
+        /// Lists completed folders that slskd no longer knows about. The transfer list is slskd's
+        /// only record of a download and anything sharing the daemon can clear it - soularr calls
+        /// "remove completed downloads" at the end of every run. A Readarr download whose import
+        /// failed therefore vanished from the queue within minutes while its files sat orphaned in
+        /// the download folder, and the only way back was Manual Import. Readarr's own download
+        /// history stands in for the record slskd lost: a recent grab sent to this client whose
+        /// folder is still on disk, and which was never imported, failed or ignored, is reported as
+        /// a completed download. A grab slskd still lists is left to the transfer list, so a folder
+        /// whose files are still arriving is never offered as complete.
+        /// </summary>
+        private List<DownloadClientItem> GetForgottenItems(HashSet<string> listedIds)
+        {
+            var items = new List<DownloadClientItem>();
+
+            try
+            {
+                var grabs = _downloadHistoryService.GetRecentGrabs(Definition.Id, _configService.DownloadClientHistoryLimit);
+
+                foreach (var grab in grabs)
+                {
+                    // Add also drops a second grab of the same peer folder, which shares the id.
+                    if (grab.DownloadId.IsNullOrWhiteSpace() || !listedIds.Add(grab.DownloadId))
+                    {
+                        continue;
+                    }
+
+                    var locator = SlskdReleaseLocator.FromDownloadUrl(grab.Release?.DownloadUrl);
+
+                    if (locator == null)
+                    {
+                        continue;
+                    }
+
+                    var outputPath = GetOutputPath(locator.Directory);
+
+                    if (!_diskProvider.FolderExists(outputPath.FullPath))
+                    {
+                        continue;
+                    }
+
+                    var latest = _downloadHistoryService.GetLatestDownloadHistoryItem(grab.DownloadId);
+
+                    if (latest == null || IsFinished(latest.EventType))
+                    {
+                        continue;
+                    }
+
+                    _logger.Trace("slskd no longer lists '{0}', offering the folder {1} for import", grab.SourceTitle, outputPath);
+
+                    items.Add(new DownloadClientItem
+                    {
+                        DownloadId = grab.DownloadId,
+                        Title = GetLeafName(locator.Directory),
+                        Category = null,
+                        TotalSize = locator.TotalSize,
+                        RemainingSize = 0,
+                        Status = DownloadItemStatus.Completed,
+                        CanBeRemoved = true,
+                        CanMoveFiles = true,
+                        OutputPath = outputPath,
+                        DownloadClientInfo = DownloadClientItemClientInfo.FromDownloadClient(this, false)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn(ex, "Unable to check the slskd download folder for downloads the daemon has forgotten");
+            }
+
+            return items;
+        }
+
+        /// <summary>
+        /// Whether a download's most recent history event means Readarr is done with it. A grab
+        /// or an incomplete import is still outstanding; an imported, failed or ignored download
+        /// is not re-offered even when its folder is still on disk.
+        /// </summary>
+        internal static bool IsFinished(DownloadHistoryEventType eventType)
+        {
+            return eventType == DownloadHistoryEventType.DownloadImported ||
+                   eventType == DownloadHistoryEventType.DownloadFailed ||
+                   eventType == DownloadHistoryEventType.DownloadIgnored;
         }
 
         private DownloadClientItem BuildItem(SlskdTransferUser user, SlskdTransferDirectory directory)
@@ -89,9 +186,7 @@ namespace NzbDrone.Core.Download.Clients.Slskd
             var totalSize = files.Sum(f => f.Size);
             var transferred = files.Sum(f => f.BytesTransferred);
 
-            var outputPath = _remotePathMappingService.RemapRemoteToLocal(
-                Settings.BaseUrl,
-                new OsPath(Path.Combine(Settings.DownloadPath, GetLeafName(directory.Directory))));
+            var outputPath = GetOutputPath(directory.Directory);
 
             return new DownloadClientItem
             {
@@ -198,6 +293,17 @@ namespace NzbDrone.Core.Download.Clients.Slskd
         private static string BuildDownloadId(string username, string directory)
         {
             return SlskdIds.ForDownload(username, directory);
+        }
+
+        /// <summary>
+        /// Where slskd puts a finished folder: its download directory plus the leaf of the peer's
+        /// folder, as Readarr sees it after remote path mapping.
+        /// </summary>
+        private OsPath GetOutputPath(string directory)
+        {
+            return _remotePathMappingService.RemapRemoteToLocal(
+                Settings.BaseUrl,
+                new OsPath(Path.Combine(Settings.DownloadPath, GetLeafName(directory))));
         }
 
         /// <summary>

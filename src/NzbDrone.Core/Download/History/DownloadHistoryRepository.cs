@@ -8,6 +8,7 @@ namespace NzbDrone.Core.Download.History
     public interface IDownloadHistoryRepository : IBasicRepository<DownloadHistory>
     {
         List<DownloadHistory> FindByDownloadId(string downloadId);
+        List<DownloadHistory> FindGrabs(int downloadClientId, int count);
         void DeleteByAuthorId(int authorId);
     }
 
@@ -23,6 +24,18 @@ namespace NzbDrone.Core.Download.History
             return Query(h => h.DownloadId == downloadId)
                 .OrderByDescending(h => h.Date)
                 .ToList();
+        }
+
+        /// <summary>
+        /// The most recent <paramref name="count"/> grabs sent to one download client, newest first.
+        /// </summary>
+        public List<DownloadHistory> FindGrabs(int downloadClientId, int count)
+        {
+            var builder = Builder()
+                .Where<DownloadHistory>(h => h.DownloadClientId == downloadClientId && h.EventType == DownloadHistoryEventType.DownloadGrabbed)
+                .OrderBy($"\"DownloadHistory\".\"Date\" DESC LIMIT {count}");
+
+            return Query(builder);
         }
 
         public void DeleteByAuthorId(int authorId)

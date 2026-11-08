@@ -246,9 +246,17 @@ inside a root folder: a finished download lives at `<client folder>/<Book>/file`
 being split. `DistanceCalculator.GetAuthorVariants` splits *every* entry into its co-authors
 ("Kevin J Anderson, Brian Herbert" → both names), not only a lone one, because audiobook tags
 routinely carry a second entry (the narrator). Hunters of Dune imported at 79.1% before both.
-Separately, soularr calls slskd's "remove completed downloads" on every run, so a Readarr download
-whose import fails vanishes from the queue within minutes and the folder is left orphaned in
-`/downloads/music`; recover it with Manual Import.
+Separately, soularr calls slskd's "remove completed downloads" on every run, so slskd forgets a
+Readarr download within minutes of it finishing, failed import or not. `Slskd.GetItems` therefore
+lists more than slskd's transfer list: `GetForgottenItems` takes this client's recent grabs from
+`DownloadHistory` (`IDownloadHistoryService.GetRecentGrabs`, capped at `DownloadClientHistoryLimit`),
+re-reads the peer folder from the grab's `slskd://` download URL, and reports the folder as a
+completed download while it still exists under the client's download path and the download's latest
+history event is not imported, failed or ignored. A grab slskd still lists is left to the transfer
+list, so a folder whose files are still arriving is never offered as complete, and when slskd is
+unreachable nothing is listed at all. The effect is that a failed import stays in the queue with its
+messages (or is retried after a restart) instead of silently disappearing; before this, the only way
+back was Manual Import on the orphaned folder in `/downloads/music`.
 
 Release→book mapping (`ParsingService.GetBooks`) checks the author's series before anything else:
 a release reading "<Series>, Book N" / "<Series> #N" / "Vol N - <Series>" is the book linked at
