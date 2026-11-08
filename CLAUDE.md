@@ -247,6 +247,17 @@ searched title inside the release name and forced it. Bare numbers ("<Series> 2"
 ("2 <Series> Books") deliberately do not count. Audible-style "Title: Series, Book N" is the normal
 slskd audiobook folder name, so this rule fires constantly.
 
+Before the series rule, the search-criteria parser (`ParseBookTitleWithSearchCriteria`) tries the
+searched book's work title, every edition title and their colon segments (`Parser.BookTitleCandidates`:
+"Dune: House Corrino" → "House Corrino"), because Open Library work titles ("Dune House Corrino")
+rarely match how peers name folders ("3 House Corrino"). `MonitoredBookSpecification` also rejects
+a release when no edition of its media type is monitored, and `SearchCriteriaBase.MonitoredBooksOnly`
+is set for every search the user did not start — it had never been assigned, so the spec skipped
+*all* searches. `SlskdIndexer.IsCollectionOfBooks` drops a peer folder holding several differently
+named m4bs (a shelf, e.g. "Dune - Frank Herbert" with all six books), which otherwise parses as one
+book and imports as one. `BlocklistService.Blocklisted` has a Soulseek branch (title + indexer +
+size); without it a "File not shared" peer was re-grabbed on every search.
+
 Soulseek has no RSS. `MissingBookSearchCommand` **and** `CutoffUnmetBookSearchCommand` are on the
 scheduler (both at `MissingBookSearchInterval`, hours, Settings → Indexers) because nothing on slskd
 is ever found otherwise.
