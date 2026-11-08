@@ -294,8 +294,12 @@ quality belongs to (a bitrate format can never match an epub); for such profiles
 memory because scores are not in the database.
 
 The `Slskd` download client sees every transfer in the daemon, and `/downloads/music` is shared
-with Lidarr. A folder Readarr did not grab is only offered for import (non-empty `Category`) when
-`ImportUngrabbedDownloads` is on and `Slskd.ShouldAdopt` finds a `BookExtensions` file in it.
+with Lidarr. `Slskd.GetItems` returns only folders Readarr grabbed (a `DownloadGrabbed` event in
+`DownloadHistory` for the folder's download id) or would adopt: a folder Readarr did not grab gets a
+non-empty `Category` only when `ImportUngrabbedDownloads` is on and `Slskd.ShouldAdopt` finds a
+`BookExtensions` file in it, and with neither it is not returned at all. It used to come back with
+a null category, which kept it out of the import step but still put Lidarr's albums in Readarr's
+queue as unknown-author items.
 Download ids and release guids come from `SlskdIds.ForDownload` — never `string.GetHashCode()`,
 which .NET randomises per process.
 

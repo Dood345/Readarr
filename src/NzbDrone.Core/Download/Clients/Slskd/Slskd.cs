@@ -75,17 +75,48 @@ namespace NzbDrone.Core.Download.Clients.Slskd
                 {
                     var item = BuildItem(user, directory);
 
-                    if (item != null)
+                    if (item == null)
                     {
-                        listed.Add(item.DownloadId);
-                        yield return item;
+                        continue;
                     }
+
+                    listed.Add(item.DownloadId);
+
+                    // The daemon is shared, so most of its transfers are someone else's - here
+                    // Lidarr's music via soularr. A folder Readarr neither grabbed nor adopts
+                    // (null category) is left out entirely: returned, it was tracked and sat in the
+                    // queue as an unknown-author item while downloading, then as a warning after.
+                    if (item.Category == null && !WasGrabbedByReadarr(item.DownloadId))
+                    {
+                        continue;
+                    }
+
+                    yield return item;
                 }
             }
 
             foreach (var item in GetForgottenItems(listed))
             {
                 yield return item;
+            }
+        }
+
+        /// <summary>
+        /// Whether Readarr's own download history holds a grab for this slskd folder. The lookup
+        /// is one indexed query per foreign folder; if it fails the folder is kept, which is what
+        /// the client did before this check existed.
+        /// </summary>
+        private bool WasGrabbedByReadarr(string downloadId)
+        {
+            try
+            {
+                return _downloadHistoryService.GetLatestGrab(downloadId) != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug(ex, "Unable to check download history for slskd transfer {0}", downloadId);
+
+                return true;
             }
         }
 
