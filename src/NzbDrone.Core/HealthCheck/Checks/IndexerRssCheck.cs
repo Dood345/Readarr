@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Indexers;
 using NzbDrone.Core.Localization;
@@ -25,7 +27,23 @@ namespace NzbDrone.Core.HealthCheck.Checks
 
             if (enabled.Empty())
             {
-                return new HealthCheck(GetType(), HealthCheckResult.Error, _localizationService.GetLocalizedString("IndexerRssHealthCheckNoIndexers"), "#no-indexers-available-with-rss-sync-enabled-readarr-will-not-grab-new-releases-automatically");
+                // Soulseek has no RSS, so the slskd indexer cannot have it enabled. New releases
+                // are still grabbed automatically there - by the scheduled Missing and Cutoff
+                // Unmet searches - so an indexer that lacks RSS but is enabled for automatic
+                // search satisfies this check rather than failing it.
+                var searchOnly = SearchOnly(_indexerFactory.AutomaticSearchEnabled(false));
+
+                if (searchOnly.Empty())
+                {
+                    return new HealthCheck(GetType(), HealthCheckResult.Error, _localizationService.GetLocalizedString("IndexerRssHealthCheckNoIndexers"), "#no-indexers-available-with-rss-sync-enabled-readarr-will-not-grab-new-releases-automatically");
+                }
+
+                if (SearchOnly(_indexerFactory.AutomaticSearchEnabled(true)).Empty())
+                {
+                    return new HealthCheck(GetType(), HealthCheckResult.Warning, _localizationService.GetLocalizedString("IndexerRssHealthCheckNoAvailableIndexers"), "#indexers-are-unavailable-due-to-failures");
+                }
+
+                return new HealthCheck(GetType());
             }
 
             var active = _indexerFactory.RssEnabled(true);
@@ -36,6 +54,11 @@ namespace NzbDrone.Core.HealthCheck.Checks
             }
 
             return new HealthCheck(GetType());
+        }
+
+        private static List<IIndexer> SearchOnly(IEnumerable<IIndexer> indexers)
+        {
+            return indexers.Where(i => !i.SupportsRss && i.SupportsSearch).ToList();
         }
     }
 }

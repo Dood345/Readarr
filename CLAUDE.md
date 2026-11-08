@@ -294,7 +294,9 @@ size); without it a "File not shared" peer was re-grabbed on every search.
 
 Soulseek has no RSS. `MissingBookSearchCommand` **and** `CutoffUnmetBookSearchCommand` are on the
 scheduler (both at `MissingBookSearchInterval`, hours, Settings → Indexers) because nothing on slskd
-is ever found otherwise.
+is ever found otherwise. `IndexerRssCheck` therefore treats an enabled search-only indexer
+(`SupportsRss` false, automatic search on) as satisfying the "no indexers with RSS sync" check;
+the stock check raised a permanent error with slskd as the only indexer.
 
 **Bitrate is the audiobook "quality" that matters, and it comes from slskd.** Readarr's
 quality-definition size limits are not enforced (`AcceptableSizeSpecification` is stubbed out) and

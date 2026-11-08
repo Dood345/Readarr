@@ -24,6 +24,10 @@ namespace NzbDrone.Core.Test.HealthCheck.Checks
                   .Setup(s => s.RssEnabled(It.IsAny<bool>()))
                   .Returns(new List<IIndexer>());
 
+            Mocker.GetMock<IIndexerFactory>()
+                  .Setup(s => s.AutomaticSearchEnabled(It.IsAny<bool>()))
+                  .Returns(new List<IIndexer>());
+
             Mocker.GetMock<ILocalizationService>()
                   .Setup(s => s.GetLocalizedString(It.IsAny<string>()))
                   .Returns("Some Warning Message");
@@ -47,6 +51,20 @@ namespace NzbDrone.Core.Test.HealthCheck.Checks
                   .Returns(new List<IIndexer> { _indexerMock.Object });
         }
 
+        private void GivenAutomaticSearchEnabled(bool blocked = false)
+        {
+            // A blocked indexer is listed only when blocked ones are not filtered out.
+            var indexers = new List<IIndexer> { _indexerMock.Object };
+
+            Mocker.GetMock<IIndexerFactory>()
+                  .Setup(s => s.AutomaticSearchEnabled(false))
+                  .Returns(indexers);
+
+            Mocker.GetMock<IIndexerFactory>()
+                  .Setup(s => s.AutomaticSearchEnabled(true))
+                  .Returns(blocked ? new List<IIndexer>() : indexers);
+        }
+
         private void GivenRssFiltered()
         {
             Mocker.GetMock<IIndexerFactory>()
@@ -68,6 +86,39 @@ namespace NzbDrone.Core.Test.HealthCheck.Checks
         public void should_return_error_when_no_rss_supported_indexer_present()
         {
             GivenIndexer(false, true);
+
+            Subject.Check().ShouldBeError();
+        }
+
+        [Test]
+        public void should_return_ok_when_a_search_only_indexer_has_automatic_search_enabled()
+        {
+            // slskd: Soulseek has no RSS, the scheduled searches grab new releases instead.
+            GivenIndexer(false, true);
+            GivenAutomaticSearchEnabled();
+
+            Subject.Check().ShouldBeOk();
+        }
+
+        [Test]
+        public void should_return_filter_warning_when_the_search_only_indexer_is_blocked()
+        {
+            GivenIndexer(false, true);
+            GivenAutomaticSearchEnabled(blocked: true);
+
+            Mocker.GetMock<ILocalizationService>()
+                  .Setup(s => s.GetLocalizedString(It.IsAny<string>()))
+                  .Returns("recent indexer errors");
+
+            Subject.Check().ShouldBeWarning("recent indexer errors");
+        }
+
+        [Test]
+        public void should_return_error_when_only_an_rss_capable_indexer_has_automatic_search()
+        {
+            // RSS is supported but switched off: that is still a misconfiguration.
+            GivenIndexer(true, true);
+            GivenAutomaticSearchEnabled();
 
             Subject.Check().ShouldBeError();
         }

@@ -69,14 +69,22 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
         }
 
         [Test]
-        public void every_book_should_have_exactly_one_monitored_edition()
+        public void every_book_should_monitor_at_most_one_edition_per_media_type()
         {
+            // A book tracks one text edition and one audiobook edition at once, so it may have
+            // two monitored editions, but never two of the same kind.
             var author = Subject.GetAuthorInfo(FrankHerbert);
 
             foreach (var book in author.Books.Value.Where(x => x.Editions.Value.Any()))
             {
-                book.Editions.Value.Count(x => x.Monitored)
-                    .Should().Be(1, "'{0}' must have exactly one monitored edition", book.Title);
+                var editions = book.Editions.Value;
+
+                editions.Count(x => x.Monitored)
+                    .Should().BeGreaterThan(0, "'{0}' must have a monitored edition", book.Title);
+                editions.Count(x => x.Monitored && x.IsEbook)
+                    .Should().BeLessOrEqualTo(1, "'{0}' may monitor only one text edition", book.Title);
+                editions.Count(x => x.Monitored && !x.IsEbook)
+                    .Should().BeLessOrEqualTo(1, "'{0}' may monitor only one audiobook edition", book.Title);
             }
         }
 
@@ -106,7 +114,8 @@ namespace NzbDrone.Core.Test.MetadataSource.OpenLibrary
             var editions = result.Item2.Editions.Value;
             editions.Should().NotBeEmpty();
             editions.Should().Contain(x => x.IsEbook, "Open Library supplies the text editions");
-            editions.Count(x => x.Monitored).Should().Be(1);
+            editions.Count(x => x.Monitored && x.IsEbook).Should().Be(1, "one text edition is monitored");
+            editions.Count(x => x.Monitored && !x.IsEbook).Should().BeLessOrEqualTo(1, "Audible adds at most one monitored audiobook edition");
         }
 
         [Test]
