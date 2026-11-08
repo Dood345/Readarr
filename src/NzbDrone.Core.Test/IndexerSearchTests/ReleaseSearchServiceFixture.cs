@@ -66,6 +66,18 @@ namespace NzbDrone.Core.Test.IndexerSearchTests
             return result;
         }
 
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        public async Task should_honour_monitoring_only_when_the_user_did_not_start_the_search(bool userInvoked, bool expectedMonitoredOnly)
+        {
+            var allCriteria = WatchForSearchCriteria();
+
+            await Subject.BookSearch(_firstBook, false, userInvoked, false);
+
+            allCriteria.Should().NotBeEmpty();
+            allCriteria.Should().OnlyContain(c => c.MonitoredBooksOnly == expectedMonitoredOnly);
+        }
+
         [Test]
         public async Task Tags_IndexerTags_AuthorNoTags_IndexerNotIncluded()
         {

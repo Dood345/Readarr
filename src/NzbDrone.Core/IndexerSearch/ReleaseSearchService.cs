@@ -129,6 +129,11 @@ namespace NzbDrone.Core.IndexerSearch
             spec.UserInvokedSearch = userInvokedSearch;
             spec.InteractiveSearch = interactiveSearch;
 
+            // Never set before, so MonitoredBookSpecification skipped every search ("Skipping
+            // monitored check during search") and scheduled searches grabbed for unmonitored
+            // editions. A search the user did not start honours monitoring; a manual one may force.
+            spec.MonitoredBooksOnly = !userInvokedSearch;
+
             return spec;
         }
 
@@ -139,6 +144,7 @@ namespace NzbDrone.Core.IndexerSearch
             spec.Author = author;
             spec.UserInvokedSearch = userInvokedSearch;
             spec.InteractiveSearch = interactiveSearch;
+            spec.MonitoredBooksOnly = !userInvokedSearch;
 
             return spec;
         }
